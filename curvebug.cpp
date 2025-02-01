@@ -105,7 +105,7 @@ DWORD ThreadID;
 //        create and display the main program window.
 //
 HWND hWnd;
-HGDIOBJ hBlackPen, hRedPen, hPinkPen, hGrayPen;
+HGDIOBJ hGreenPen, hRedPen, hPinkPen, hLtGrnPen;
 bool dualDisplay;
 bool Painting = FALSE;
 
@@ -122,99 +122,90 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 	hRedPen = CreatePen(BS_SOLID, 1, RGB(255,0,0));
-	hBlackPen = CreatePen(BS_SOLID, 1, RGB(0,0,0));
-	hPinkPen = CreatePen(BS_SOLID, 1, RGB(255,200,200));
-	hGrayPen = CreatePen(BS_SOLID, 1, RGB(200,200,200));
+	hGreenPen = CreatePen(BS_SOLID, 1, RGB(0,255,0));
+	hPinkPen = CreatePen(BS_SOLID, 1, RGB(127,0,0));
+	hLtGrnPen = CreatePen(BS_SOLID, 1, RGB(0,127,0));
 
 
-   ShowWindow(hWnd, SW_MAXIMIZE);
+   ShowWindow(hWnd, SW_SHOWNORMAL);
    UpdateWindow(hWnd);
    CreateThread(NULL,8000, WorkerProc, NULL, 0, &ThreadID);
    return TRUE;
 }
 
-#define OFFSET 300
+POINT LineToDraw[N_POINTS];
 
 void DoPaint(HWND hWnd){
-	HDC hdc;
+	HDC hdc, Memhdc;
 	PAINTSTRUCT ps;
+	HBITMAP Membitmap;
 	RECT rc;
-	long xScale, yScale, width;
+	long xScale, yScale, width, height;
 	WORD x, y, i, floor;
+
 	Painting = TRUE;
 	GetClientRect(hWnd, &rc);
 
-	hdc = BeginPaint(hWnd, &ps);
 	width = rc.right - rc.left;
-	floor = (rc.bottom - rc.top) * 7/ 8 + rc.top;
+	height = rc.bottom - rc.top;
+	floor = height * 7/ 8 + rc.top;
 	xScale = ((DWORD)width << 16) / ADC_MAX;
-    yScale = ((rc.bottom - rc.top) << 16) / (ADC_MAX - 700);
+    yScale = (height << 16) / (ADC_MAX - 700);
+	hdc = BeginPaint(hWnd, &ps);
+	hdc = GetDC(hWnd);
+	Memhdc = CreateCompatibleDC(hdc);
+	Membitmap = CreateCompatibleBitmap(hdc, width, height);
+	SelectObject(Memhdc, Membitmap);
 
-	SelectObject(hdc, hBlackPen);
-	x = (WORD)((xScale * DataPoints[1]) >> 16);
-	x = (rc.left + width-1) - x;
-	y = (WORD)((yScale * (DataPoints[0] - DataPoints[1])) >> 16);
-	y += floor; // offset??
-	MoveToEx(hdc, x, y,0);
-    for (i = 3; i < N_POINTS*3; i += 3) {
-		x = (WORD)((xScale * DataPoints[1+i]) >> 16);
-		x = (rc.left + width - 1) - x;
-		y = (WORD)((yScale * (DataPoints[0+i] - DataPoints[1+i])) >> 16);
-		y += floor; // offset??
-
-		LineTo(hdc, x, y );
+	int ii;
+	SelectObject(Memhdc, hGreenPen);
+	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+		LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * DataPoints[1 + i]) >> 16);
+		LineToDraw[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
 	}
+	Polyline(Memhdc, LineToDraw, N_POINTS);
 
-	SelectObject(hdc, hRedPen);
-	x = (WORD)((xScale * DataPoints[2]) >> 16);
-	x = (rc.left + width - 1) - x;
-	y = (WORD)((yScale * (DataPoints[0] - DataPoints[2])) >> 16);
-	y += floor; // offset??
-	MoveToEx(hdc, x, y, 0);
-	for (i = 3; i < N_POINTS * 3; i += 3) {
-		x = (WORD)((xScale * DataPoints[2 + i]) >> 16);
-		x = (rc.left + width - 1) - x;
-		y = (WORD)((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16);
-		y += floor; // offset??
 
-		LineTo(hdc, x, y);
-
+	SelectObject(Memhdc, hRedPen);
+	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+		LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * DataPoints[2 + i]) >> 16);
+		LineToDraw[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
 	}
-	Painting = FALSE;
-	Sleep(20);
-/*
+	Polyline(Memhdc, LineToDraw, N_POINTS);
+
+
 	if (dualDisplay){
 		xScale /= 2;
 		yScale /= 2;
-		Width /= 2;
-		int VertOffset = (rc.bottom + rc.top)/2;
+		width /= 2;
+		floor -= height/2;
 
-		SelectObject(hdc, hPinkPen);
-		x = rc.left + (int)(xScale * AltData[2]) + (Width);
-		y = VertOffset + (int)(yScale * (AltData[1] - AltData[2]));
-		MoveToEx(hdc, x, y,0);
-		for (i = 3; i < N_POINTS * 3; i += 3) {
-			x = rc.left + (int)(xScale * AltData[i+2]) + (Width);
-			y = VertOffset + (int)(yScale * (AltData[i+1] - AltData[i+2]));
-
-			LineTo(hdc, x, y );
+		SelectObject(Memhdc, hPinkPen);
+		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+			LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * AltData[2 + i]) >> 16);
+			LineToDraw[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
 		}
-		SelectObject(hdc, hGrayPen);
-		x = rc.left + (int)(xScale * AltData[0]) + (Width);
-		y = VertOffset + (int)(yScale * (AltData[1] - AltData[0]));
-		MoveToEx(hdc, x, y,0);
-		for (i = 3; i < N_POINTS * 3; i += 3) {
-			x = rc.left + (int)(xScale * AltData[i]) + (Width);
-			y = VertOffset + (int)(yScale * (AltData[i+1] - AltData[i]));
+		Polyline(Memhdc, LineToDraw, N_POINTS);
 
-			LineTo(hdc, x, y );
+		SelectObject(Memhdc, hLtGrnPen);
+		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+			LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * AltData[1 + i]) >> 16);
+			LineToDraw[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
 		}
+		Polyline(Memhdc, LineToDraw, N_POINTS);
 	}
-	*/
 
-  //  TextOut(hdc, 20, 20, L"Hello, Windows!", 15); 
+   //TextOut(Memhdc, 20, 20, L"Hello, Windows!", 15); 
+	
 
+
+	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
+	DeleteObject(Membitmap);
+	DeleteDC(Memhdc);
+	DeleteDC(hdc);
 	EndPaint(hWnd, &ps);
+	Painting = FALSE;
+//	Sleep(20);
 
 }
 
@@ -267,6 +258,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			Sleep(50);
 		PostQuitMessage(0);
 		break;
+	case WM_ERASEBKGND:
+		return 1;
+		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 	}
@@ -311,40 +305,3 @@ void Damnit() {
 	exit(1);
 }
 
-
-#if 0
-/*
-this code goes in your window procedure in the WM_PAINT message handler
-NOTE: you may need to set the window background not to draw itself
-before you register the window class:
-[NAME_OF_YOUR_WNDCLASSEX].hbrBackground	= NULL;
-*/
-
-RECT Client_Rect;
-GetClientRect(hWnd, &Client_Rect);
-int win_width = Client_Rect.right - Client_Rect.left;
-int win_height = Client_Rect.bottom + Client_Rect.left;
-PAINTSTRUCT ps;
-HDC Memhdc;
-HDC hdc;
-HBITMAP Membitmap;
-hdc = BeginPaint(hWnd, &ps);
-Memhdc = CreateCompatibleDC(hdc);
-Membitmap = CreateCompatibleBitmap(hdc, win_width, win_height);
-SelectObject(Memhdc, Membitmap);
-//drawing code goes in here
-BitBlt(hdc, 0, 0, win_width, win_height, Memhdc, 0, 0, SRCCOPY);
-DeleteObject(Membitmap);
-DeleteDC(Memhdc);
-DeleteDC(hdc);
-EndPaint(hWnd, &ps);
-
-/*
-Basically this is whare you are doing:
-1  Make a copy of the device context that is the same format as the
-default one that is showing (the device context is the object you draw to)
-2  Copy what is in the on screen dc to your copied dc
-3  Draw on the copy
-4  Put what is in the copy back onto the original dc which gets displayed
-*/
-#endif
