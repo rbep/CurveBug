@@ -141,7 +141,7 @@ void DoPaint(HWND hWnd){
 	HBITMAP Membitmap;
 	RECT rc;
 	long xScale, yScale, width, height;
-	WORD x, y, i, floor;
+	WORD i, floor;
 
 	Painting = TRUE;
 	GetClientRect(hWnd, &rc);
@@ -290,18 +290,14 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	return (INT_PTR)FALSE;
 }
 
-void Damnit() {
-	LPTSTR txt = NULL;
-	FormatMessage(
-		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS,
-		NULL,    // unused with FORMAT_MESSAGE_FROM_SYSTEM
-		GetLastError(),
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-		(LPTSTR)&txt,
-		0,
-		NULL);
-	MessageBox(NULL, txt, L"Oops!", MB_SYSTEMMODAL);
-	LocalFree(txt);
+void Damnit(wchar_t *msg) {
+	WCHAR errMsg[128];
+
+	if (msg == NULL) {
+		msg = errMsg;
+		_wcserror_s(errMsg, sizeof(errMsg) / sizeof(*errMsg), GetLastError());
+	}
+	MessageBox(NULL, msg, L"Bummer!", MB_SYSTEMMODAL);
 	exit(1);
 }
 

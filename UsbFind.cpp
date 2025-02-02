@@ -10,8 +10,6 @@
 
 WCHAR* MyPidVid = L"\\\\?\\USB#VID_0483&PID_5740";
 
-// https://learn.microsoft.com/en-us/windows-hardware/drivers/serports/device-interface-publication-sercx#accessing-the-serial-port-device-interface
-
 HANDLE FindCommPort() {
 
     DWORD ret;
@@ -26,13 +24,13 @@ HANDLE FindCommPort() {
         (LPGUID)&GUID_DEVINTERFACE_COMPORT,
         NULL,
         CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
-    if (ret != CR_SUCCESS) Damnit();
+    if (ret != CR_SUCCESS) Damnit(NULL);
 
     //
     // Allocate buffer of the determined size.
     //
     PWCHAR deviceInterfaceListBuffer = (PWCHAR)malloc(deviceInterfaceListBufferLength * sizeof(WCHAR));
-    if (deviceInterfaceListBuffer == NULL) Damnit();
+    if (deviceInterfaceListBuffer == NULL) Damnit(NULL);
 
     //
     // Fetch the list of all GUID_DEVINTERFACE_COMPORT device interfaces present
@@ -44,7 +42,7 @@ HANDLE FindCommPort() {
         deviceInterfaceListBuffer,
         deviceInterfaceListBufferLength,
         CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
-    if (ret != CR_SUCCESS) Damnit();
+    if (ret != CR_SUCCESS) Damnit(NULL);
 
     //
     // Iterate through the list, examining one interface at a time
@@ -67,11 +65,11 @@ HANDLE FindCommPort() {
             NULL,
             &devPropSize,
             0);
-        if (configRet != CR_BUFFER_SMALL) Damnit();
+        if (configRet != CR_BUFFER_SMALL) Damnit(NULL);
 
         // Allocate the buffer
         devPropBuffer = (PWCHAR)malloc(devPropSize);
-        if (devPropBuffer == NULL) Damnit();
+        if (devPropBuffer == NULL) Damnit(NULL);
 
         configRet = CM_Get_Device_Interface_PropertyW(
             currentInterface,
@@ -80,11 +78,11 @@ HANDLE FindCommPort() {
             (PBYTE)devPropBuffer,
             &devPropSize,
             0);
-        if (configRet != CR_SUCCESS) Damnit();
+        if (configRet != CR_SUCCESS) Damnit(NULL);
 
         // Verify the value is the correct type and size
         if ((devPropType != DEVPROP_TYPE_STRING) || (devPropSize < sizeof(WCHAR))) 
-            Damnit();
+            Damnit(NULL);
 
         // Now, check if the interface is the one we are interested in
         if (wcsncmp(currentInterface, MyPidVid, wcslen(MyPidVid)) == 0){
@@ -102,7 +100,7 @@ HANDLE FindCommPort() {
     // over all interfaces without a match) - or, it points to the interface with
     // the friendly name UART0, in which case we can open it.
     //
-    if (*currentInterface == L'\0') Damnit();
+    if (*currentInterface == L'\0') Damnit(L"Couldn't find device");
 
     //
     // Now open the device interface as we would a COMx style serial port.
@@ -115,7 +113,7 @@ HANDLE FindCommPort() {
         OPEN_EXISTING,
         0,
         NULL);
-    if (portHandle == INVALID_HANDLE_VALUE) Damnit();
+    if (portHandle == INVALID_HANDLE_VALUE) Damnit(L"I/O Open failed");
     COMMTIMEOUTS timeouts;
     timeouts.ReadIntervalTimeout = 10;
     timeouts.ReadTotalTimeoutMultiplier = 1;
@@ -123,7 +121,7 @@ HANDLE FindCommPort() {
     timeouts.WriteTotalTimeoutConstant = 200;
     timeouts.WriteTotalTimeoutMultiplier = 1;
 
-    if (!SetCommTimeouts(portHandle, &timeouts)) Damnit();
+    if (!SetCommTimeouts(portHandle, &timeouts)) Damnit(NULL);
 
     free(deviceInterfaceListBuffer);
 

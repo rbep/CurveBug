@@ -14,4 +14,4 @@ extern bool dualDisplay;
 extern bool Painting;
 
 DWORD WINAPI WorkerProc(LPVOID lpParam);
-void Damnit();
+void Damnit(wchar_t *msg);
