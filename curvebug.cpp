@@ -88,7 +88,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
 	wcex.lpszMenuName	= L""; //MAKEINTRESOURCE(IDC_CURVE3);
 	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDC_CURVEBUG));
 
 	return RegisterClassEx(&wcex);
 }
@@ -106,13 +106,13 @@ DWORD ThreadID;
 //
 HWND hWnd;
 HGDIOBJ hGreenPen, hRedPen, hPinkPen, hLtGrnPen;
+HBRUSH hBackGround;
 bool dualDisplay;
 bool Painting = FALSE;
+bool Getting = FALSE;
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-
-
    hInst = hInstance; // Store instance handle in our global variable
    hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
@@ -122,11 +122,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 	hRedPen = CreatePen(BS_SOLID, 1, RGB(255,0,0));
-	hGreenPen = CreatePen(BS_SOLID, 1, RGB(0,255,0));
-	hPinkPen = CreatePen(BS_SOLID, 1, RGB(127,0,0));
-	hLtGrnPen = CreatePen(BS_SOLID, 1, RGB(0,127,0));
-
-
+	hGreenPen = CreatePen(BS_SOLID, 1, RGB(0,0,0));
+	hPinkPen = CreatePen(BS_SOLID, 1, RGB(200,100 ,100));
+	hLtGrnPen = CreatePen(BS_SOLID, 1, RGB(127,127,127));
+	hBackGround = CreateSolidBrush(RGB(200, 200, 200));
    ShowWindow(hWnd, SW_SHOWNORMAL);
    UpdateWindow(hWnd);
    CreateThread(NULL,8000, WorkerProc, NULL, 0, &ThreadID);
@@ -140,15 +139,17 @@ void DoPaint(HWND hWnd){
 	PAINTSTRUCT ps;
 	HBITMAP Membitmap;
 	RECT rc;
-	long xScale, yScale, width, height;
-	WORD i, floor;
+	long xScale, yScale, width, height, xOffset;
+	WORD i,ii, floor;
 
 	Painting = TRUE;
+	while (Getting) Sleep(1);
 	GetClientRect(hWnd, &rc);
 
 	width = rc.right - rc.left;
 	height = rc.bottom - rc.top;
 	floor = height * 7/ 8 + rc.top;
+	xOffset = (rc.left + width - 1);
 	xScale = ((DWORD)width << 16) / ADC_MAX;
     yScale = (height << 16) / (ADC_MAX - 700);
 	hdc = BeginPaint(hWnd, &ps);
@@ -156,11 +157,13 @@ void DoPaint(HWND hWnd){
 	Memhdc = CreateCompatibleDC(hdc);
 	Membitmap = CreateCompatibleBitmap(hdc, width, height);
 	SelectObject(Memhdc, Membitmap);
+	FillRect(Memhdc, &rc, hBackGround);
+	SetBkColor(Memhdc, RGB(200, 200, 200));
 
-	int ii;
+
 	SelectObject(Memhdc, hGreenPen);
 	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-		LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * DataPoints[1 + i]) >> 16);
+		LineToDraw[ii].x = xOffset - ((xScale * DataPoints[1 + i]) >> 16);
 		LineToDraw[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
 	}
 	Polyline(Memhdc, LineToDraw, N_POINTS);
@@ -168,36 +171,33 @@ void DoPaint(HWND hWnd){
 
 	SelectObject(Memhdc, hRedPen);
 	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-		LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * DataPoints[2 + i]) >> 16);
+		LineToDraw[ii].x = xOffset - ((xScale * DataPoints[2 + i]) >> 16);
 		LineToDraw[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
 	}
 	Polyline(Memhdc, LineToDraw, N_POINTS);
 
-
-	if (dualDisplay){
+	if (dualDisplay) {
 		xScale /= 2;
 		yScale /= 2;
-		width /= 2;
-		floor -= height/2;
+		xOffset -= width/2;
+		floor -= height / 2;
 
 		SelectObject(Memhdc, hPinkPen);
 		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-			LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * AltData[2 + i]) >> 16);
+			LineToDraw[ii].x = xOffset - ((xScale * AltData[2 + i]) >> 16);
 			LineToDraw[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
 		}
 		Polyline(Memhdc, LineToDraw, N_POINTS);
 
 		SelectObject(Memhdc, hLtGrnPen);
 		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-			LineToDraw[ii].x = (rc.left + width - 1) - ((xScale * AltData[1 + i]) >> 16);
+			LineToDraw[ii].x = xOffset - ((xScale * AltData[1 + i]) >> 16);
 			LineToDraw[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
 		}
 		Polyline(Memhdc, LineToDraw, N_POINTS);
 	}
 
-   //TextOut(Memhdc, 20, 20, L"Hello, Windows!", 15); 
-	
-
+   //TextOut(Memhdc, 20, 20, L"Hello, Windows!", 16); 
 
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
 	DeleteObject(Membitmap);
@@ -205,8 +205,6 @@ void DoPaint(HWND hWnd){
 	DeleteDC(hdc);
 	EndPaint(hWnd, &ps);
 	Painting = FALSE;
-//	Sleep(20);
-
 }
 
 

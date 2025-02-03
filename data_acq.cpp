@@ -28,27 +28,36 @@ void GetData(void){
     DWORD returnedReadings;
 
     while (!Stopping) {
+		Getting = true;
 		if (Painting) {
-			Sleep(1);
+			Getting = false;
+			Sleep(1); 
 			continue;
 		}
 		WriteFile(ioHandle, "T", 1, &returnedReadings, NULL);
-		Sleep(1);
+		Sleep(2);
 		if (!ReadFile(ioHandle, DataPoints, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
 		if (sizeof(adcBuffer_t) == returnedReadings)
 			InvalidateRect(hWnd, 0, FALSE);
-		else
+		else {
 			Sleep(5);
+			if (!ReadFile(ioHandle, DataPoints, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+			continue;
+		}
 		if (dualDisplay) {
 			WriteFile(ioHandle, "W", 1, &returnedReadings, NULL);
-			Sleep(1);
+			Sleep(2);
 			if (!ReadFile(ioHandle, AltData, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
 			if (sizeof(adcBuffer_t) == returnedReadings)
 				InvalidateRect(hWnd, 0, FALSE);
-			else
+			else {
 				Sleep(5);
+				if (!ReadFile(ioHandle, AltData, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+				continue;
+			}
 		}
-
+		Getting = false;
+		Sleep(5);
 	}
 
    

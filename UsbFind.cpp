@@ -115,9 +115,9 @@ HANDLE FindCommPort() {
         NULL);
     if (portHandle == INVALID_HANDLE_VALUE) Damnit(L"I/O Open failed");
     COMMTIMEOUTS timeouts;
-    timeouts.ReadIntervalTimeout = 10;
+    timeouts.ReadIntervalTimeout = 40;
     timeouts.ReadTotalTimeoutMultiplier = 1;
-    timeouts.ReadTotalTimeoutConstant = 400;
+    timeouts.ReadTotalTimeoutConstant = 200;
     timeouts.WriteTotalTimeoutConstant = 200;
     timeouts.WriteTotalTimeoutMultiplier = 1;
 

@@ -12,6 +12,7 @@ extern bool Stopped;
 extern bool Stopping;
 extern bool dualDisplay;
 extern bool Painting;
+extern bool Getting;
 
 DWORD WINAPI WorkerProc(LPVOID lpParam);
 void Damnit(wchar_t *msg);

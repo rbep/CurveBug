@@ -93,7 +93,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="curvebug.ico" />
-    <None Include="small.ico" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="curvebug.rc" />
