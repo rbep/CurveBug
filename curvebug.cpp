@@ -12,6 +12,10 @@
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
+bool Stopped = false;
+bool Stopping = false;
+DWORD stalls = 0;
+HANDLE hMutex;
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -28,6 +32,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
  	// TODO: Place code here.
+	hMutex = CreateMutex(NULL, FALSE, NULL);
 	MSG msg;
 	HACCEL hAccelTable;
 
@@ -105,7 +110,7 @@ DWORD ThreadID;
 //        create and display the main program window.
 //
 HWND hWnd;
-HGDIOBJ hGreenPen, hRedPen, hPinkPen, hLtGrnPen;
+HGDIOBJ hBlackPen, hRedPen, hPinkPen, hGrayPen;
 HBRUSH hBackGround;
 bool dualDisplay;
 bool Painting = FALSE;
@@ -122,9 +127,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 	hRedPen = CreatePen(BS_SOLID, 1, RGB(255,0,0));
-	hGreenPen = CreatePen(BS_SOLID, 1, RGB(0,0,0));
+	hBlackPen = CreatePen(BS_SOLID, 1, RGB(0,0,0));
 	hPinkPen = CreatePen(BS_SOLID, 1, RGB(200,100 ,100));
-	hLtGrnPen = CreatePen(BS_SOLID, 1, RGB(127,127,127));
+	hGrayPen = CreatePen(BS_SOLID, 1, RGB(127,127,127));
 	hBackGround = CreateSolidBrush(RGB(200, 200, 200));
    ShowWindow(hWnd, SW_SHOWNORMAL);
    UpdateWindow(hWnd);
@@ -132,7 +137,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
-POINT LineToDraw[N_POINTS];
+POINT BlackLine[N_POINTS];
+POINT RedLine[N_POINTS];
 
 void DoPaint(HWND hWnd){
 	HDC hdc, Memhdc;
@@ -142,8 +148,6 @@ void DoPaint(HWND hWnd){
 	long xScale, yScale, width, height, xOffset;
 	WORD i,ii, floor;
 
-	Painting = TRUE;
-	while (Getting) Sleep(1);
 	GetClientRect(hWnd, &rc);
 
 	width = rc.right - rc.left;
@@ -161,50 +165,54 @@ void DoPaint(HWND hWnd){
 	SetBkColor(Memhdc, RGB(200, 200, 200));
 
 
-	SelectObject(Memhdc, hGreenPen);
 	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-		LineToDraw[ii].x = xOffset - ((xScale * DataPoints[1 + i]) >> 16);
-		LineToDraw[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
+		BlackLine[ii].x = xOffset - ((xScale * DataPoints[1 + i]) >> 16);
+		BlackLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
 	}
-	Polyline(Memhdc, LineToDraw, N_POINTS);
 
-
+	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+		RedLine[ii].x = xOffset - ((xScale * DataPoints[2 + i]) >> 16);
+		RedLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
+	}
+	WaitForSingleObject(hMutex, INFINITE);
+	SelectObject(Memhdc, hBlackPen);
+	Polyline(Memhdc, BlackLine, N_POINTS);
 	SelectObject(Memhdc, hRedPen);
-	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-		LineToDraw[ii].x = xOffset - ((xScale * DataPoints[2 + i]) >> 16);
-		LineToDraw[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
-	}
-	Polyline(Memhdc, LineToDraw, N_POINTS);
+	Polyline(Memhdc, RedLine, N_POINTS);
+	ReleaseMutex(hMutex);
 
 	if (dualDisplay) {
-		xScale /= 2;
-		yScale /= 2;
-		xOffset -= width/2;
-		floor -= height / 2;
+		xScale = xScale * 3 / 4;
+		yScale = yScale * 3 / 4;
+		xOffset -= width/4;
+		floor -= height / 4;
 
+		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+			BlackLine[ii].x = xOffset - ((xScale * AltData[2 + i]) >> 16);
+			BlackLine[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
+		}
+
+		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
+			RedLine[ii].x = xOffset - ((xScale * AltData[1 + i]) >> 16);
+			RedLine[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
+		}
+		WaitForSingleObject(hMutex, INFINITE);
 		SelectObject(Memhdc, hPinkPen);
-		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-			LineToDraw[ii].x = xOffset - ((xScale * AltData[2 + i]) >> 16);
-			LineToDraw[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
-		}
-		Polyline(Memhdc, LineToDraw, N_POINTS);
-
-		SelectObject(Memhdc, hLtGrnPen);
-		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-			LineToDraw[ii].x = xOffset - ((xScale * AltData[1 + i]) >> 16);
-			LineToDraw[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
-		}
-		Polyline(Memhdc, LineToDraw, N_POINTS);
+		Polyline(Memhdc, BlackLine, N_POINTS);
+		SelectObject(Memhdc, hGrayPen);
+		Polyline(Memhdc, RedLine, N_POINTS);
+		ReleaseMutex(hMutex);
 	}
-
-   //TextOut(Memhdc, 20, 20, L"Hello, Windows!", 16); 
+	
+	TCHAR text[20];
+	_itot(stalls, text, 10);
+    TextOut(Memhdc, 20, 20, text, _tcsclen(text));
 
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
 	DeleteObject(Membitmap);
 	DeleteDC(Memhdc);
 	DeleteDC(hdc);
 	EndPaint(hWnd, &ps);
-	Painting = FALSE;
 }
 
 

@@ -122,6 +122,7 @@ HANDLE FindCommPort() {
     timeouts.WriteTotalTimeoutMultiplier = 1;
 
     if (!SetCommTimeouts(portHandle, &timeouts)) Damnit(NULL);
+    PurgeComm(portHandle, PURGE_RXCLEAR);
 
     free(deviceInterfaceListBuffer);
 

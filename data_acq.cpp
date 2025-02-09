@@ -8,8 +8,6 @@ adcBuffer_t AltData;
 HANDLE ioHandle;
 
 void GetData(void);
-bool Stopped = false;
-bool Stopping = false;
 
 
 void InitComms(){
@@ -24,43 +22,51 @@ DWORD WINAPI WorkerProc(LPVOID lpParam) {
 	ExitThread(0);
 }
 
-void GetData(void){
-    DWORD returnedReadings;
+void GetData(void) {
+	DWORD returnedReadings;
+	adcBuffer_t localBuf;
+	bool needRepaint;
+	DWORD ticks;
 
-    while (!Stopping) {
-		Getting = true;
-		if (Painting) {
-			Getting = false;
-			Sleep(1); 
-			continue;
-		}
+	while (!Stopping) {
+		needRepaint = false;
 		WriteFile(ioHandle, "T", 1, &returnedReadings, NULL);
-		Sleep(2);
-		if (!ReadFile(ioHandle, DataPoints, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
-		if (sizeof(adcBuffer_t) == returnedReadings)
-			InvalidateRect(hWnd, 0, FALSE);
+		ticks = GetTickCount();
+		if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+		ticks = GetTickCount() - ticks;
+		if (sizeof(adcBuffer_t) == returnedReadings) {
+			needRepaint = true;
+			WaitForSingleObject(hMutex, INFINITE);
+			memcpy(DataPoints, localBuf, sizeof(adcBuffer_t));
+			ReleaseMutex(hMutex);
+		}
 		else {
-			Sleep(5);
-			if (!ReadFile(ioHandle, DataPoints, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+			stalls++;
+			Sleep(40);
+			PurgeComm(ioHandle, PURGE_RXCLEAR);
 			continue;
 		}
 		if (dualDisplay) {
 			WriteFile(ioHandle, "W", 1, &returnedReadings, NULL);
-			Sleep(2);
-			if (!ReadFile(ioHandle, AltData, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
-			if (sizeof(adcBuffer_t) == returnedReadings)
-				InvalidateRect(hWnd, 0, FALSE);
+ 			if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+			if (sizeof(adcBuffer_t) == returnedReadings) {
+				needRepaint = true;
+				WaitForSingleObject(hMutex, INFINITE);
+				memcpy(AltData, localBuf, sizeof(adcBuffer_t));
+				ReleaseMutex(hMutex); 
+			}
 			else {
-				Sleep(5);
-				if (!ReadFile(ioHandle, AltData, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+				stalls++;
+				Sleep(40);
+				PurgeComm(ioHandle, PURGE_RXCLEAR);
 				continue;
 			}
 		}
-		Getting = false;
-		Sleep(5);
+		if (needRepaint)
+			InvalidateRect(hWnd, 0, FALSE);
 	}
 
-   
+
 	//Stop the stream
 	CloseHandle(ioHandle);
 	Stopped = true;
