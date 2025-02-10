@@ -22,48 +22,40 @@ DWORD WINAPI WorkerProc(LPVOID lpParam) {
 	ExitThread(0);
 }
 
-void GetData(void) {
+bool GrabAFrame(adcBuffer_t buf, char cmd){
 	DWORD returnedReadings;
 	adcBuffer_t localBuf;
-	bool needRepaint;
-	DWORD ticks;
-
-	while (!Stopping) {
-		needRepaint = false;
-		WriteFile(ioHandle, "T", 1, &returnedReadings, NULL);
-		ticks = GetTickCount();
-		if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
-		ticks = GetTickCount() - ticks;
-		if (sizeof(adcBuffer_t) == returnedReadings) {
-			needRepaint = true;
-			WaitForSingleObject(hMutex, INFINITE);
-			memcpy(DataPoints, localBuf, sizeof(adcBuffer_t));
-			ReleaseMutex(hMutex);
-		}
-		else {
-			stalls++;
+	WriteFile(ioHandle, &cmd, 1, &returnedReadings, NULL);
+	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+	if (sizeof(adcBuffer_t) == returnedReadings) {
+		if (0 == (localBuf[0] & 0x8000)) { // look for sync flag
 			Sleep(40);
 			PurgeComm(ioHandle, PURGE_RXCLEAR);
+			return false;
+		}
+		localBuf[0] &= ~0x8000; // clear that flag 
+		WaitForSingleObject(hMutex, INFINITE);
+		memcpy(buf, localBuf, sizeof(adcBuffer_t));
+		ReleaseMutex(hMutex);
+		return true;
+	}
+	stalls++;
+	Sleep(40);
+	PurgeComm(ioHandle, PURGE_RXCLEAR);
+	false;
+}
+
+void GetData(void) {
+	
+	while (!Stopping) {
+		if (!GrabAFrame(DataPoints, 'T'))
 			continue;
-		}
 		if (dualDisplay) {
-			WriteFile(ioHandle, "W", 1, &returnedReadings, NULL);
- 			if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
-			if (sizeof(adcBuffer_t) == returnedReadings) {
-				needRepaint = true;
-				WaitForSingleObject(hMutex, INFINITE);
-				memcpy(AltData, localBuf, sizeof(adcBuffer_t));
-				ReleaseMutex(hMutex); 
-			}
-			else {
-				stalls++;
-				Sleep(40);
-				PurgeComm(ioHandle, PURGE_RXCLEAR);
+			if (!GrabAFrame(AltData, 'W'))
 				continue;
-			}
 		}
-		if (needRepaint)
-			InvalidateRect(hWnd, 0, FALSE);
+		InvalidateRect(hWnd, 0, FALSE);
+		continue;
 	}
 
 
