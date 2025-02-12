@@ -9,6 +9,7 @@
 
 
 WCHAR* MyPidVid = L"\\\\?\\USB#VID_0483&PID_5740";
+WCHAR* MyPidVid2 = L"\\\\?\\USB#VID_0483&PID_5741";
 
 HANDLE FindCommPort() {
 
@@ -85,7 +86,8 @@ HANDLE FindCommPort() {
             Damnit(NULL);
 
         // Now, check if the interface is the one we are interested in
-        if (wcsncmp(currentInterface, MyPidVid, wcslen(MyPidVid)) == 0){
+        if (wcsncmp(currentInterface, MyPidVid, wcslen(MyPidVid)) == 0
+            || wcsncmp(currentInterface, MyPidVid2, wcslen(MyPidVid2)) == 0){
             free(devPropBuffer);
             break;
         }
@@ -100,7 +102,8 @@ HANDLE FindCommPort() {
     // over all interfaces without a match) - or, it points to the interface with
     // the friendly name UART0, in which case we can open it.
     //
-    if (*currentInterface == L'\0') Damnit(L"Couldn't find device");
+    if (*currentInterface == L'\0') 
+        Damnit(L"Couldn't find device");
 
     //
     // Now open the device interface as we would a COMx style serial port.

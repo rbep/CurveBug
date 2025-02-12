@@ -25,10 +25,12 @@ DWORD WINAPI WorkerProc(LPVOID lpParam) {
 bool GrabAFrame(adcBuffer_t buf, char cmd){
 	DWORD returnedReadings;
 	adcBuffer_t localBuf;
+
 	WriteFile(ioHandle, &cmd, 1, &returnedReadings, NULL);
 	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
 	if (sizeof(adcBuffer_t) == returnedReadings) {
 		if (0 == (localBuf[0] & 0x8000)) { // look for sync flag
+			stalls++;
 			Sleep(40);
 			PurgeComm(ioHandle, PURGE_RXCLEAR);
 			return false;
@@ -54,6 +56,7 @@ void GetData(void) {
 			if (!GrabAFrame(AltData, 'W'))
 				continue;
 		}
+		scans++;
 		InvalidateRect(hWnd, 0, FALSE);
 		continue;
 	}

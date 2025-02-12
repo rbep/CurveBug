@@ -14,7 +14,7 @@ TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 bool Stopped = false;
 bool Stopping = false;
-DWORD stalls = 0;
+DWORD stalls = 0, scans = 0;
 HANDLE hMutex;
 
 // Forward declarations of functions included in this code module:
@@ -139,6 +139,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 POINT BlackLine[N_POINTS];
 POINT RedLine[N_POINTS];
+int nPaints = 0;
 
 void DoPaint(HWND hWnd){
 	HDC hdc, Memhdc;
@@ -206,7 +207,11 @@ void DoPaint(HWND hWnd){
 	
 	TCHAR text[20];
 	_itot(stalls, text, 10);
-    TextOut(Memhdc, 20, 20, text, _tcsclen(text));
+    TextOut(Memhdc, 15, 15, text, _tcsclen(text));
+	_itot(scans, text, 10);
+	TextOut(Memhdc, 15, 30, text, _tcsclen(text));
+	_itot(scans - nPaints++, text, 10);
+	TextOut(Memhdc, 15, 45, text, _tcsclen(text));
 
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
 	DeleteObject(Membitmap);
@@ -250,10 +255,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_KEYDOWN:
-		dualDisplay= !dualDisplay;
-		break;
-	case WM_LBUTTONDOWN:
-		DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+		switch (wParam) {
+		case VK_SPACE:
+			dualDisplay = !dualDisplay;
+			break;
+		case VK_F1:
+			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+			break;
+		}
 		break;
 	case WM_PAINT:
 		DoPaint(hWnd);
