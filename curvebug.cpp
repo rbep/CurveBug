@@ -130,7 +130,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	hBlackPen = CreatePen(BS_SOLID, 1, RGB(0,0,0));
 	hPinkPen = CreatePen(BS_SOLID, 1, RGB(200,100 ,100));
 	hGrayPen = CreatePen(BS_SOLID, 1, RGB(127,127,127));
-	hBackGround = CreateSolidBrush(RGB(200, 200, 200));
+	hBackGround = CreateSolidBrush(BACKGROUND_COLOR);
+   SetBkColor(GetDC(hWnd), BACKGROUND_COLOR);
    ShowWindow(hWnd, SW_SHOWNORMAL);
    UpdateWindow(hWnd);
    CreateThread(NULL,8000, WorkerProc, NULL, 0, &ThreadID);
@@ -163,9 +164,10 @@ void DoPaint(HWND hWnd){
 	Membitmap = CreateCompatibleBitmap(hdc, width, height);
 	SelectObject(Memhdc, Membitmap);
 	FillRect(Memhdc, &rc, hBackGround);
-	SetBkColor(Memhdc, RGB(200, 200, 200));
+	//SetBkColor(Memhdc, BACKGROUND_COLOR);
 
 
+	WaitForSingleObject(hMutex, INFINITE);
 	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
 		BlackLine[ii].x = xOffset - ((xScale * DataPoints[1 + i]) >> 16);
 		BlackLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
@@ -175,12 +177,12 @@ void DoPaint(HWND hWnd){
 		RedLine[ii].x = xOffset - ((xScale * DataPoints[2 + i]) >> 16);
 		RedLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
 	}
-	WaitForSingleObject(hMutex, INFINITE);
+	ReleaseMutex(hMutex);
+
 	SelectObject(Memhdc, hBlackPen);
 	Polyline(Memhdc, BlackLine, N_POINTS);
 	SelectObject(Memhdc, hRedPen);
 	Polyline(Memhdc, RedLine, N_POINTS);
-	ReleaseMutex(hMutex);
 
 	if (dualDisplay) {
 		xScale = xScale * 3 / 4;
@@ -188,6 +190,7 @@ void DoPaint(HWND hWnd){
 		xOffset -= width/4;
 		floor -= height / 4;
 
+		WaitForSingleObject(hMutex, INFINITE);
 		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
 			BlackLine[ii].x = xOffset - ((xScale * AltData[2 + i]) >> 16);
 			BlackLine[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
@@ -197,12 +200,12 @@ void DoPaint(HWND hWnd){
 			RedLine[ii].x = xOffset - ((xScale * AltData[1 + i]) >> 16);
 			RedLine[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
 		}
-		WaitForSingleObject(hMutex, INFINITE);
+		ReleaseMutex(hMutex);
+
 		SelectObject(Memhdc, hPinkPen);
 		Polyline(Memhdc, BlackLine, N_POINTS);
 		SelectObject(Memhdc, hGrayPen);
 		Polyline(Memhdc, RedLine, N_POINTS);
-		ReleaseMutex(hMutex);
 	}
 	
 	TCHAR text[20];
