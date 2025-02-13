@@ -3,8 +3,7 @@
 #include "resource.h"
 
 #define ADC_MAX 2400L
-#define N_POINTS (1512/3)
-//#define N_POINTS (1002/3)  //jjjjj
+#define N_POINTS (1008/3)
 
 #define DIM(a) (sizeof(a)/sizeof(a[0]))
 typedef WORD adcBuffer_t[N_POINTS * 3];
