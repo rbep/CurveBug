@@ -11,6 +11,7 @@ typedef WORD adcBuffer_t[N_POINTS * 3];
 
 extern adcBuffer_t DataPoints, AltData;
 extern HWND hWnd;
+extern bool Hold;
 extern bool Stopped;
 extern bool Stopping;
 extern bool dualDisplay;

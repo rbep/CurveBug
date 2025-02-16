@@ -50,6 +50,10 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 void GetData(void) {
 	
 	while (!Stopping) {
+		if (Hold) {
+			Sleep(100);
+			continue;
+		}
 		if (!GrabAFrame(DataPoints, 'T'))
 			continue;
 		if (dualDisplay) {
@@ -58,6 +62,7 @@ void GetData(void) {
 		}
 		scans++;
 		InvalidateRect(hWnd, 0, FALSE);
+		Sleep(2);
 		continue;
 	}
 

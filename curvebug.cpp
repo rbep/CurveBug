@@ -14,6 +14,7 @@ TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
 TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 bool Stopped = false;
 bool Stopping = false;
+bool Hold = false;								// just pause the data
 DWORD stalls = 0, scans = 0;
 HANDLE hMutex;
 
@@ -164,7 +165,7 @@ void DoPaint(HWND hWnd){
 	Membitmap = CreateCompatibleBitmap(hdc, width, height);
 	SelectObject(Memhdc, Membitmap);
 	FillRect(Memhdc, &rc, hBackGround);
-	//SetBkColor(Memhdc, BACKGROUND_COLOR);
+	SetBkColor(Memhdc, BACKGROUND_COLOR);
 
 
 	WaitForSingleObject(hMutex, INFINITE);
@@ -258,12 +259,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		break;
 	case WM_KEYDOWN:
+		Hold = false;
 		switch (wParam) {
 		case VK_SPACE:
 			dualDisplay = !dualDisplay;
 			break;
 		case VK_F1:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+			break;
+		case 'P':
+			Hold = true;
 			break;
 		}
 		break;
