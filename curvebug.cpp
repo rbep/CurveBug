@@ -15,7 +15,7 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 bool Stopped = false;
 bool Stopping = false;
 bool Hold = false;								// just pause the data
-DWORD stalls = 0, scans = 0;
+DWORD scans = 0;
 HANDLE hMutex;
 
 // Forward declarations of functions included in this code module:
@@ -141,7 +141,6 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 
 POINT BlackLine[N_POINTS];
 POINT RedLine[N_POINTS];
-int nPaints = 0;
 
 void DoPaint(HWND hWnd){
 	HDC hdc, Memhdc;
@@ -210,12 +209,12 @@ void DoPaint(HWND hWnd){
 	}
 	
 	TCHAR text[20];
-	_itot(stalls, text, 10);
-    TextOut(Memhdc, 15, 15, text, _tcsclen(text));
+	//_itot(0, text, 10);
+    //TextOut(Memhdc, 15, 15, text, _tcsclen(text));
 	_itot(scans, text, 10);
 	TextOut(Memhdc, 15, 30, text, _tcsclen(text));
-	_itot(scans - nPaints++, text, 10);
-	TextOut(Memhdc, 15, 45, text, _tcsclen(text));
+	//_itot(scans - nPaints++, text, 10);
+	//TextOut(Memhdc, 15, 45, text, _tcsclen(text));
 
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
 	DeleteObject(Membitmap);

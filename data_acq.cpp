@@ -27,26 +27,28 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 	adcBuffer_t localBuf;
 
 	WriteFile(ioHandle, &cmd, 1, &returnedReadings, NULL);
-	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) Damnit(L"I/O error");
+	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) 
+		Damnit(L"I/O error");
 	if (sizeof(adcBuffer_t) == returnedReadings) {
 		if (0 == (localBuf[0] & 0x8000)) { // look for sync flag
-			stalls++;
 			Sleep(40);
 			PurgeComm(ioHandle, PURGE_RXCLEAR);
 			return false;
 		}
 		localBuf[0] &= ~0x8000; // clear that flag 
+
+		// block display update while we fill with new data
 		WaitForSingleObject(hMutex, INFINITE);
 		memcpy(buf, localBuf, sizeof(adcBuffer_t));
 		ReleaseMutex(hMutex);
 		return true;
 	}
-	stalls++;
 	Sleep(40);
 	PurgeComm(ioHandle, PURGE_RXCLEAR);
-	false;
+	return false;
 }
 
+// Data acquisition loop
 void GetData(void) {
 	
 	while (!Stopping) {
@@ -54,14 +56,14 @@ void GetData(void) {
 			Sleep(100);
 			continue;
 		}
-		if (!GrabAFrame(DataPoints, 'T'))
+		if (!GrabAFrame(DataPoints, 'T')) // trigger strong scan
 			continue;
 		if (dualDisplay) {
-			if (!GrabAFrame(AltData, 'W'))
+			if (!GrabAFrame(AltData, 'W')) // trigger weak scan
 				continue;
 		}
 		scans++;
-		InvalidateRect(hWnd, 0, FALSE);
+		InvalidateRect(hWnd, 0, FALSE); // new data... signal repaint need
 		Sleep(2);
 		continue;
 	}

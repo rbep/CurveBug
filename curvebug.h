@@ -16,7 +16,6 @@ extern bool Stopped;
 extern bool Stopping;
 extern bool dualDisplay;
 extern HANDLE hMutex;
-extern DWORD stalls;
 extern DWORD scans;
 
 DWORD WINAPI WorkerProc(LPVOID lpParam);
