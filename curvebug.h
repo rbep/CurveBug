@@ -2,7 +2,7 @@
 
 #include "resource.h"
 
-#define ADC_MAX 2400L
+#define ADC_MAX 2800L
 #define N_POINTS (1008/3)
 #define BACKGROUND_COLOR RGB(200, 200, 200)
 
@@ -14,9 +14,11 @@ extern HWND hWnd;
 extern bool Hold;
 extern bool Stopped;
 extern bool Stopping;
-extern bool dualDisplay;
 extern HANDLE hMutex;
 extern DWORD scans;
+
+enum  Mode { strong, weak, dual };
+extern Mode DriveMode;
 
 DWORD WINAPI WorkerProc(LPVOID lpParam);
 void Damnit(wchar_t *msg);

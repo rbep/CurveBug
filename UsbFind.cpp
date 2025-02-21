@@ -7,11 +7,6 @@
 
 #pragma comment(lib, "setupapi.lib")
 
-
-WCHAR* MyPidVid = L"\\\\?\\USB#VID_0483&PID_5740";
-WCHAR* MyPidVid2 = L"\\\\?\\USB#VID_0483&PID_5741";
-
-
 wchar_t* VidPids[] = {
 
     L"\\\\?\\usb#vid_0483&pid_5740",
@@ -46,7 +41,6 @@ HANDLE OpenSpecifiedDevice(
 		NULL); // not interested in the specific dev-node
 
 
-	//predictedLength = requiredLength;
 
 	functionClassDeviceData = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(requiredLength);
 	if (functionClassDeviceData == NULL) Damnit(NULL);

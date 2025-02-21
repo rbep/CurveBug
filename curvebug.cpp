@@ -17,6 +17,7 @@ bool Stopping = false;
 bool Hold = false;								// just pause the data
 DWORD scans = 0;
 HANDLE hMutex;
+Mode DriveMode = strong;
 
 // Forward declarations of functions included in this code module:
 ATOM				MyRegisterClass(HINSTANCE hInstance);
@@ -113,7 +114,6 @@ DWORD ThreadID;
 HWND hWnd;
 HGDIOBJ hBlackPen, hRedPen, hPinkPen, hGrayPen;
 HBRUSH hBackGround;
-bool dualDisplay;
 bool Painting = FALSE;
 bool Getting = FALSE;
 
@@ -184,7 +184,7 @@ void DoPaint(HWND hWnd){
 	SelectObject(Memhdc, hRedPen);
 	Polyline(Memhdc, RedLine, N_POINTS);
 
-	if (dualDisplay) {
+	if (DriveMode == dual) {
 		xScale = xScale * 3 / 4;
 		yScale = yScale * 3 / 4;
 		xOffset -= width/4;
@@ -209,12 +209,11 @@ void DoPaint(HWND hWnd){
 	}
 	
 	TCHAR text[20];
-	//_itot(0, text, 10);
-    //TextOut(Memhdc, 15, 15, text, _tcsclen(text));
+	if (DriveMode == weak) {
+		TextOut(Memhdc, 15, 15, L"WEAK", 4);
+	}
 	_itot(scans, text, 10);
 	TextOut(Memhdc, 15, 30, text, _tcsclen(text));
-	//_itot(scans - nPaints++, text, 10);
-	//TextOut(Memhdc, 15, 45, text, _tcsclen(text));
 
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
 	DeleteObject(Membitmap);
@@ -261,7 +260,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		Hold = false;
 		switch (wParam) {
 		case VK_SPACE:
-			dualDisplay = !dualDisplay;
+			switch (DriveMode) {
+			case strong:
+				DriveMode = weak;
+				break;
+			case weak:
+				DriveMode = dual;
+				break;
+			case dual:
+				DriveMode = strong;
+			}
 			break;
 		case VK_F1:
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);

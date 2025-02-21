@@ -56,9 +56,9 @@ void GetData(void) {
 			Sleep(100);
 			continue;
 		}
-		if (!GrabAFrame(DataPoints, 'T')) // trigger strong scan
+		if (!GrabAFrame(DataPoints, DriveMode != weak ? 'T' : 'W')) // trigger strong scan
 			continue;
-		if (dualDisplay) {
+		if (DriveMode == dual) {
 			if (!GrabAFrame(AltData, 'W')) // trigger weak scan
 				continue;
 		}
