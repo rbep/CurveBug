@@ -55,7 +55,4 @@
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
-  <ItemGroup>
-    <Library Include="..\..\..\..\..\Program Files (x86)\Windows Kits\10\Lib\10.0.22000.0\um\x86\cfgmgr32.lib" />
-  </ItemGroup>
 </Project>

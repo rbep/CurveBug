@@ -5,87 +5,183 @@
 #include <ntddser.h>
 #include "curvebug.h"
 
+#pragma comment(lib, "setupapi.lib")
+
+
 WCHAR* MyPidVid = L"\\\\?\\USB#VID_0483&PID_5740";
 WCHAR* MyPidVid2 = L"\\\\?\\USB#VID_0483&PID_5741";
 
 
-HANDLE FindCommPort() {
+wchar_t* VidPids[] = {
 
-	DWORD ret;
-	ULONG deviceInterfaceListBufferLength;
+    L"\\\\?\\usb#vid_0483&pid_5740",
+    L"\\\\?\\usb#vid_0483&pid_5741"
 
-	//
-	// Determine the size (in characters) of buffer required for to fetch a list of
-	// all GUID_DEVINTERFACE_COMPORT device interfaces present on the system.
-	//
-	ret = CM_Get_Device_Interface_List_SizeW(&deviceInterfaceListBufferLength, (LPGUID)&GUID_DEVINTERFACE_COMPORT, NULL, CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
-	if (ret != CR_SUCCESS) Damnit(NULL);
+};
 
-	//
-	// Allocate buffer of the determined size.
-	//
-	PWCHAR deviceInterfaceListBuffer = (PWCHAR)malloc(deviceInterfaceListBufferLength * sizeof(WCHAR));
-	if (deviceInterfaceListBuffer == NULL) Damnit(NULL);
 
-	//
-	// Fetch the list of all GUID_DEVINTERFACE_COMPORT device interfaces present
-	// on the system.
-	//
-	ret = CM_Get_Device_Interface_ListW((LPGUID)&GUID_DEVINTERFACE_COMPORT, NULL, deviceInterfaceListBuffer, deviceInterfaceListBufferLength, CM_GET_DEVICE_INTERFACE_LIST_PRESENT);
-	if (ret != CR_SUCCESS) Damnit(NULL);
+HANDLE OpenSpecifiedDevice(
+	IN       HDEVINFO                    HardwareDeviceInfo,
+	IN       PSP_INTERFACE_DEVICE_DATA   DeviceInterfaceData,
+	OUT		 wchar_t** devName,
+	OUT      DWORD& devInst,
+	rsize_t	 bufsize
+)
+{
+	PSP_INTERFACE_DEVICE_DETAIL_DATA     functionClassDeviceData = NULL;
+	ULONG                                requiredLength = 0;
+	HANDLE								 hOut = INVALID_HANDLE_VALUE;
+	SP_DEVINFO_DATA						 devInfoData;
 
 	//
-	// Iterate through the list, examining one interface at a time
+	// allocate a function class device data structure to receive the
+	// goods about this particular device.
 	//
-	PWCHAR currentInterface = deviceInterfaceListBuffer;
-	while (*currentInterface) {
-		//
-		// Fetch the DEVPKEY_DeviceInterface_Serial_PortName for this interface
-		//
-		CONFIGRET configRet;
-		DEVPROPTYPE devPropType;
-		PWCHAR devPropBuffer;
-		ULONG devPropSize = 0;
+	SetupDiGetInterfaceDeviceDetail(
+		HardwareDeviceInfo,
+		DeviceInterfaceData,
+		NULL, // probing so no output buffer yet
+		0, // probing so output buffer length of zero
+		&requiredLength,
+		NULL); // not interested in the specific dev-node
 
-		// First, get the size of buffer required
-		configRet = CM_Get_Device_Interface_PropertyW(currentInterface, &DEVPKEY_DeviceInterface_Serial_PortName, &devPropType, NULL, &devPropSize, 0);
-		if (configRet != CR_BUFFER_SMALL) Damnit(NULL);
 
-		// Allocate the buffer
-		devPropBuffer = (PWCHAR)malloc(devPropSize);
-		if (devPropBuffer == NULL) Damnit(NULL);
+	//predictedLength = requiredLength;
 
-		configRet = CM_Get_Device_Interface_PropertyW(currentInterface, &DEVPKEY_DeviceInterface_Serial_PortName, &devPropType, (PBYTE)devPropBuffer, &devPropSize, 0);
-		if (configRet != CR_SUCCESS) Damnit(NULL);
+	functionClassDeviceData = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(requiredLength);
+	if (functionClassDeviceData == NULL) Damnit(NULL);
+	functionClassDeviceData->cbSize = sizeof(SP_INTERFACE_DEVICE_DETAIL_DATA);
+	devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
 
-		// Verify the value is the correct type and size
-		if ((devPropType != DEVPROP_TYPE_STRING) || (devPropSize < sizeof(WCHAR)))
-			Damnit(NULL);
-
-		// Now, check if the interface is the one we are interested in
-		if (wcsncmp(currentInterface, MyPidVid, wcslen(MyPidVid)) == 0
-			|| wcsncmp(currentInterface, MyPidVid2, wcslen(MyPidVid2)) == 0) {
-			free(devPropBuffer);
-			break;
-		}
-
-		// Advance to the next string (past the terminating NULL)
-		currentInterface += wcslen(currentInterface) + 1;
-		free(devPropBuffer);
+	//
+	// Retrieve the information from Plug and Play.
+	//
+	if (!SetupDiGetInterfaceDeviceDetail(
+		HardwareDeviceInfo,
+		DeviceInterfaceData,
+		functionClassDeviceData,
+		requiredLength,
+		&requiredLength,
+		&devInfoData))
+	{
+		free(functionClassDeviceData);
+		return INVALID_HANDLE_VALUE;
 	}
 
-	//
-	// currentInterface now either points to NULL (there was no match and we iterated
-	// over all interfaces without a match) - or, it points to the interface with
-	// the friendly name UART0, in which case we can open it.
-	//
-	if (*currentInterface == L'\0')
-		Damnit(L"Couldn't find device");
+	*devName = NULL;
+	for (int i = 0; i < sizeof(VidPids) / sizeof(VidPids[0]); i++) {
+		wchar_t* PidVidStr = VidPids[i];
+		if (wcsncmp(functionClassDeviceData->DevicePath, PidVidStr, wcslen(PidVidStr)) == 0) {
+			*devName = _wcsdup(functionClassDeviceData->DevicePath); // must be freed by caller not good form.
+			hOut = (HANDLE)3;
+			break;
+		}
+	}
+
+	free(functionClassDeviceData);
+	return hOut;
+}
+
+
+HANDLE OpenUsbDevice(LPGUID  pGuid, wchar_t** devpath, DWORD& outDevInst, rsize_t bufsize)
+/*++
+Routine Description:
+
+Do the required PnP things in order to find the next available proper device in the system at this time.
+
+Arguments:
+pGuid:      ptr to GUID registered by the driver itself
+devpath: the generated name for this device
+
+Return Value:
+
+return HANDLE if the open and initialization was successful,
+else INVALID_HANDLE_VALUE.
+--*/
+{
+	ULONG                    NumberDevices = 20;
+	HANDLE                   hOut = INVALID_HANDLE_VALUE;
+	HDEVINFO                 hDevInfo;
+	SP_INTERFACE_DEVICE_DATA deviceInterfaceData;
+	ULONG                    i;
+	BOOLEAN                  done;
 
 	//
-	// Now open the device interface as we would a COMx style serial port.
+	// Open a handle to the plug and play dev node.
+	// SetupDiGetClassDevs() returns a device information set that contains info on all
+	// installed devices of a specified class.
 	//
-	HANDLE portHandle = CreateFileW(currentInterface, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+	hDevInfo = SetupDiGetClassDevs(
+		pGuid,
+		NULL, // Define no enumerator (global)
+		NULL, // Define no
+		(DIGCF_PRESENT | // Only Devices present
+			DIGCF_INTERFACEDEVICE)); // Function class devices.
+	if (hDevInfo == INVALID_HANDLE_VALUE)
+		Damnit(NULL);
+	//
+	// Take a wild guess at the number of devices we have;
+	// Be prepared to realloc and retry if there are more than we guessed
+	//
+	deviceInterfaceData.cbSize = sizeof(SP_INTERFACE_DEVICE_DATA);
+
+	for (i = 0, done = FALSE; !done;) {
+		NumberDevices += 20;  // keep increasing the number of devices until we reach the limit
+		for (; i < NumberDevices; i++) {
+
+			// SetupDiEnumDeviceInterfaces() returns information about device interfaces
+			// exposed by one or more devices. Each call returns information about one interface;
+			// the routine can be called repeatedly to get information about several interfaces
+			// exposed by one or more devices.
+			if (SetupDiEnumDeviceInterfaces(
+				hDevInfo,   // pointer to a device information set
+				NULL,       // pointer to an SP_DEVINFO_DATA, We don't care about specific PDOs
+				pGuid,      // pointer to a GUID
+				i,          //zero-based index into the list of interfaces in the device information set
+				&deviceInterfaceData)) // pointer to a caller-allocated buffer that contains a completed SP_DEVICE_INTERFACE_DATA structure
+			{
+				// open the device
+				hOut = OpenSpecifiedDevice(hDevInfo, &deviceInterfaceData, devpath, outDevInst, bufsize);
+				if (hOut != INVALID_HANDLE_VALUE)
+				{
+					done = TRUE;
+					break;
+				}
+			}
+			else {
+				// EnumDeviceInterfaces error
+				if (ERROR_NO_MORE_ITEMS == GetLastError())
+					done = TRUE;
+			}
+		}  // end-for
+	}
+
+	SetupDiDestroyDeviceInfoList(hDevInfo);
+	return hOut;
+}
+
+
+
+HANDLE FindCommPort()
+{
+	wchar_t* devpath = NULL;
+	DWORD dwDevInst = 0;
+	int err = ERROR_SUCCESS;
+	HANDLE portHandle;
+
+	//
+	// Find and open a handle to the Comm driver object.
+	//
+	if (OpenUsbDevice((LPGUID)&GUID_DEVINTERFACE_COMPORT, &devpath, dwDevInst, MAX_PATH) == INVALID_HANDLE_VALUE)
+		Damnit(L"Couldn't find device");
+
+	portHandle = CreateFile(devpath,
+		GENERIC_READ | GENERIC_WRITE,
+		NULL,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
 	if (portHandle == INVALID_HANDLE_VALUE)
 		Damnit(L"I/O Open failed");
 	COMMTIMEOUTS timeouts;
@@ -99,8 +195,10 @@ HANDLE FindCommPort() {
 		Damnit(NULL);
 	PurgeComm(portHandle, PURGE_RXCLEAR);
 
-	free(deviceInterfaceListBuffer);
+
+	if (devpath) free(devpath);
 
 	return portHandle;
 
 }
+

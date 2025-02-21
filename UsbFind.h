@@ -1,2 +1,2 @@
 
-HANDLE FindCommPort();
+HANDLE FindCommPort(void);
