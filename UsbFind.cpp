@@ -1,7 +1,5 @@
 #include "stdafx.h"
 
-#include <cfgmgr32.h>
-#include <devpkey.h>
 #include <ntddser.h>
 #include "curvebug.h"
 
