@@ -8,24 +8,18 @@
 #pragma comment(lib, "setupapi.lib")
 
 wchar_t* VidPids[] = {
-
-    L"\\\\?\\usb#vid_0483&pid_5740",
-    L"\\\\?\\usb#vid_0483&pid_5741"
-
+	L"\\\\?\\usb#vid_0483&pid_5740",
+	L"\\\\?\\usb#vid_0483&pid_5741"
 };
 
 
-HANDLE OpenSpecifiedDevice(
+wchar_t* NameOfMyCommDevice(
 	IN       HDEVINFO                    HardwareDeviceInfo,
-	IN       PSP_INTERFACE_DEVICE_DATA   DeviceInterfaceData,
-	OUT		 wchar_t** devName,
-	OUT      DWORD& devInst,
-	rsize_t	 bufsize
-)
+	IN       PSP_INTERFACE_DEVICE_DATA   DeviceInterfaceData)
 {
+	wchar_t* devName = NULL;
 	PSP_INTERFACE_DEVICE_DETAIL_DATA     functionClassDeviceData = NULL;
 	ULONG                                requiredLength = 0;
-	HANDLE								 hOut = INVALID_HANDLE_VALUE;
 	SP_DEVINFO_DATA						 devInfoData;
 
 	//
@@ -59,45 +53,29 @@ HANDLE OpenSpecifiedDevice(
 		&devInfoData))
 	{
 		free(functionClassDeviceData);
-		return INVALID_HANDLE_VALUE;
+		return NULL;
 	}
 
-	*devName = NULL;
 	for (int i = 0; i < sizeof(VidPids) / sizeof(VidPids[0]); i++) {
 		wchar_t* PidVidStr = VidPids[i];
 		if (wcsncmp(functionClassDeviceData->DevicePath, PidVidStr, wcslen(PidVidStr)) == 0) {
-			*devName = _wcsdup(functionClassDeviceData->DevicePath); // must be freed by caller not good form.
-			hOut = (HANDLE)3;
+			devName = _wcsdup(functionClassDeviceData->DevicePath); // must be freed by caller not good form.
 			break;
 		}
 	}
 
 	free(functionClassDeviceData);
-	return hOut;
+	return devName;
 }
 
 
-HANDLE OpenUsbDevice(LPGUID  pGuid, wchar_t** devpath, DWORD& outDevInst, rsize_t bufsize)
-/*++
-Routine Description:
-
-Do the required PnP things in order to find the next available proper device in the system at this time.
-
-Arguments:
-pGuid:      ptr to GUID registered by the driver itself
-devpath: the generated name for this device
-
-Return Value:
-
-return HANDLE if the open and initialization was successful,
-else INVALID_HANDLE_VALUE.
---*/
+HANDLE FindCommPort()
 {
-	ULONG                    NumberDevices = 20;
-	HANDLE                   hOut = INVALID_HANDLE_VALUE;
+	wchar_t* devpath = NULL;
+	HANDLE portHandle;
 	HDEVINFO                 hDevInfo;
 	SP_INTERFACE_DEVICE_DATA deviceInterfaceData;
-	ULONG                    i;
+	ULONG                    devIndex = 0;
 	BOOLEAN                  done;
 
 	//
@@ -106,69 +84,40 @@ else INVALID_HANDLE_VALUE.
 	// installed devices of a specified class.
 	//
 	hDevInfo = SetupDiGetClassDevs(
-		pGuid,
+		(LPGUID)&GUID_DEVINTERFACE_COMPORT,
 		NULL, // Define no enumerator (global)
 		NULL, // Define no
 		(DIGCF_PRESENT | // Only Devices present
 			DIGCF_INTERFACEDEVICE)); // Function class devices.
-	if (hDevInfo == INVALID_HANDLE_VALUE)
-		Damnit(NULL);
+
 	//
 	// Take a wild guess at the number of devices we have;
 	// Be prepared to realloc and retry if there are more than we guessed
 	//
 	deviceInterfaceData.cbSize = sizeof(SP_INTERFACE_DEVICE_DATA);
 
-	for (i = 0, done = FALSE; !done;) {
-		NumberDevices += 20;  // keep increasing the number of devices until we reach the limit
-		for (; i < NumberDevices; i++) {
-
-			// SetupDiEnumDeviceInterfaces() returns information about device interfaces
-			// exposed by one or more devices. Each call returns information about one interface;
-			// the routine can be called repeatedly to get information about several interfaces
-			// exposed by one or more devices.
-			if (SetupDiEnumDeviceInterfaces(
-				hDevInfo,   // pointer to a device information set
-				NULL,       // pointer to an SP_DEVINFO_DATA, We don't care about specific PDOs
-				pGuid,      // pointer to a GUID
-				i,          //zero-based index into the list of interfaces in the device information set
-				&deviceInterfaceData)) // pointer to a caller-allocated buffer that contains a completed SP_DEVICE_INTERFACE_DATA structure
-			{
-				// open the device
-				hOut = OpenSpecifiedDevice(hDevInfo, &deviceInterfaceData, devpath, outDevInst, bufsize);
-				if (hOut != INVALID_HANDLE_VALUE)
-				{
-					done = TRUE;
-					break;
-				}
-			}
-			else {
-				// EnumDeviceInterfaces error
-				if (ERROR_NO_MORE_ITEMS == GetLastError())
-					done = TRUE;
-			}
-		}  // end-for
+	// SetupDiEnumDeviceInterfaces() returns information about device interfaces
+	// exposed by one or more devices. Each call returns information about one interface;
+	// the routine can be called repeatedly to get information about several interfaces
+	// exposed by one or more devices.
+	while (NULL !=
+		SetupDiEnumDeviceInterfaces(
+			hDevInfo,   // pointer to a device information set
+			NULL,       // pointer to an SP_DEVINFO_DATA, We don't care about specific PDOs
+			(LPGUID)&GUID_DEVINTERFACE_COMPORT,      // pointer to a GUID
+			devIndex,          //zero-based index into the list of interfaces in the device information set
+			&deviceInterfaceData)) // pointer to a caller-allocated buffer that contains a completed SP_DEVICE_INTERFACE_DATA structure
+	{
+		// open the device
+		devpath = NameOfMyCommDevice(hDevInfo, &deviceInterfaceData);
+		if (devpath != NULL)
+			break;
 	}
 
+	if (!devpath)
+		Damnit(L"Couldn't Find Device");
+
 	SetupDiDestroyDeviceInfoList(hDevInfo);
-	return hOut;
-}
-
-
-
-HANDLE FindCommPort()
-{
-	wchar_t* devpath = NULL;
-	DWORD dwDevInst = 0;
-	int err = ERROR_SUCCESS;
-	HANDLE portHandle;
-
-	//
-	// Find and open a handle to the Comm driver object.
-	//
-	if (OpenUsbDevice((LPGUID)&GUID_DEVINTERFACE_COMPORT, &devpath, dwDevInst, MAX_PATH) == INVALID_HANDLE_VALUE)
-		Damnit(L"Couldn't find device");
-
 	portHandle = CreateFile(devpath,
 		GENERIC_READ | GENERIC_WRITE,
 		NULL,
@@ -195,4 +144,5 @@ HANDLE FindCommPort()
 	return portHandle;
 
 }
+
 
