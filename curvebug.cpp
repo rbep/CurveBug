@@ -26,14 +26,14 @@ LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK	About(HWND, UINT, WPARAM, LPARAM);
 
 int APIENTRY _tWinMain(HINSTANCE hInstance,
-                     HINSTANCE hPrevInstance,
-                     LPTSTR    lpCmdLine,
-                     int       nCmdShow)
+	HINSTANCE hPrevInstance,
+	LPTSTR    lpCmdLine,
+	int       nCmdShow)
 {
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
- 	// TODO: Place code here.
+	// TODO: Place code here.
 	hMutex = CreateMutex(NULL, FALSE, NULL);
 	MSG msg;
 	HACCEL hAccelTable;
@@ -44,7 +44,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	MyRegisterClass(hInstance);
 
 	// Perform application initialization:
-	if (!InitInstance (hInstance, nCmdShow))
+	if (!InitInstance(hInstance, nCmdShow))
 	{
 		return FALSE;
 	}
@@ -61,7 +61,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		}
 	}
 
-	return (int) msg.wParam;
+	return (int)msg.wParam;
 }
 
 
@@ -85,17 +85,18 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
 
-	wcex.style			= CS_HREDRAW | CS_VREDRAW;
-	wcex.lpfnWndProc	= WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
-	wcex.hInstance		= hInstance;
-	wcex.hIcon			= LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CURVEBUG));
-	wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
-	wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
-	wcex.lpszMenuName	= L""; //MAKEINTRESOURCE(IDC_CURVE3);
-	wcex.lpszClassName	= szWindowClass;
-	wcex.hIconSm		= LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDC_CURVEBUG));
+	wcex.style = CS_HREDRAW | CS_VREDRAW;
+	wcex.lpfnWndProc = WndProc;
+	wcex.cbClsExtra = 0;
+	wcex.cbWndExtra = 0;
+	wcex.hInstance = hInstance;
+	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CURVEBUG));
+	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+	//wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
+	wcex.hbrBackground = CreateSolidBrush(BACKGROUND_COLOR);
+	wcex.lpszMenuName = L""; //MAKEINTRESOURCE(IDC_CURVE3);
+	wcex.lpszClassName = szWindowClass;
+	wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDC_CURVEBUG));
 
 	return RegisterClassEx(&wcex);
 }
@@ -112,62 +113,74 @@ DWORD ThreadID;
 //        create and display the main program window.
 //
 HWND hWnd;
-HGDIOBJ hBlackPen, hRedPen, hPinkPen, hGrayPen;
+HGDIOBJ hBlackPen, hRedPen, hPinkPen, hGrayPen, hGreenPen;
 HBRUSH hBackGround;
 bool Painting = FALSE;
 bool Getting = FALSE;
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // Store instance handle in our global variable
-   hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+	hInst = hInstance; // Store instance handle in our global variable
+	hWnd = CreateWindow(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+		CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
-	hRedPen = CreatePen(BS_SOLID, 1, RGB(255,0,0));
-	hBlackPen = CreatePen(BS_SOLID, 1, RGB(0,0,0));
-	hPinkPen = CreatePen(BS_SOLID, 1, RGB(200,100 ,100));
-	hGrayPen = CreatePen(BS_SOLID, 1, RGB(127,127,127));
+	if (!hWnd)
+	{
+		return FALSE;
+	}
+	hRedPen = CreatePen(BS_SOLID, 1, RGB(255, 0, 0));
+	hBlackPen = CreatePen(BS_SOLID, 1, RGB(0, 0, 0));
+	hPinkPen = CreatePen(BS_SOLID, 1, RGB(200, 100, 100));
+	hGrayPen = CreatePen(BS_SOLID, 1, RGB(127, 127, 127));
+	hGreenPen = CreatePen(BS_SOLID, 1, RGB(0, 200, 0));
 	hBackGround = CreateSolidBrush(BACKGROUND_COLOR);
-   SetBkColor(GetDC(hWnd), BACKGROUND_COLOR);
-   ShowWindow(hWnd, SW_SHOWNORMAL);
-   UpdateWindow(hWnd);
-   CreateThread(NULL,8000, WorkerProc, NULL, 0, &ThreadID);
-   return TRUE;
+	SetBkColor(GetDC(hWnd), BACKGROUND_COLOR);
+	ShowWindow(hWnd, SW_SHOWNORMAL);
+	UpdateWindow(hWnd);
+
+	// launch the data acquistion thread
+	CreateThread(NULL, 8000, WorkerProc, NULL, 0, &ThreadID);
+	return TRUE;
 }
 
-POINT BlackLine[N_POINTS];
-POINT RedLine[N_POINTS];
 
-void DoPaint(HWND hWnd){
+void DoPaint(HWND hWnd) {
 	HDC hdc, Memhdc;
 	PAINTSTRUCT ps;
 	HBITMAP Membitmap;
 	RECT rc;
 	long xScale, yScale, width, height, xOffset;
-	WORD i,ii, floor;
+	WORD i, ii, floor;
+	static POINT BlackLine[N_POINTS];	// vertices of black polyline
+	static POINT RedLine[N_POINTS];		// " " of Red Line
 
-	GetClientRect(hWnd, &rc);
+	GetClientRect(hWnd, &rc);			// What are we repainting?
 
+	// figure out the bounds and scaling of what we're drawing
 	width = rc.right - rc.left;
 	height = rc.bottom - rc.top;
-	floor = height * 7/ 8 + rc.top;
+	floor = height * 7 / 8 + rc.top;
 	xOffset = (rc.left + width - 1);
-	xScale = ((DWORD)width << 16) / ADC_MAX;
-    yScale = (height << 16) / (ADC_MAX - 700);
-	hdc = BeginPaint(hWnd, &ps);
+	xScale = ((DWORD)width << 16) / ADC_MAX;	// eschew floating point
+	yScale = (height << 16) / (ADC_MAX - 700);	
+
+
+	hdc = BeginPaint(hWnd, &ps);	// mystic call that Windows requires
 	hdc = GetDC(hWnd);
+
+	// create off-screen display bitmap to paint on
 	Memhdc = CreateCompatibleDC(hdc);
 	Membitmap = CreateCompatibleBitmap(hdc, width, height);
 	SelectObject(Memhdc, Membitmap);
+
+	// Background color for the bitamp
 	FillRect(Memhdc, &rc, hBackGround);
-	SetBkColor(Memhdc, BACKGROUND_COLOR);
+	SetBkColor(Memhdc, BACKGROUND_COLOR); // for text drawing
 
-
+	// grab Mutex so we can insure a coherent data set
 	WaitForSingleObject(hMutex, INFINITE);
+
+	// scale and offset the data into poly-line vertices
 	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
 		BlackLine[ii].x = xOffset - ((xScale * DataPoints[1 + i]) >> 16);
 		BlackLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
@@ -177,17 +190,29 @@ void DoPaint(HWND hWnd){
 		RedLine[ii].x = xOffset - ((xScale * DataPoints[2 + i]) >> 16);
 		RedLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
 	}
+	// we're done with the data points, allow updates
 	ReleaseMutex(hMutex);
 
+	// paint the poly-lines
 	SelectObject(Memhdc, hBlackPen);
 	Polyline(Memhdc, BlackLine, N_POINTS);
 	SelectObject(Memhdc, hRedPen);
 	Polyline(Memhdc, RedLine, N_POINTS);
+	SelectObject(Memhdc, hGreenPen);
 
+	// draw an origin marker
+	DWORD xOrigin = xOffset - ((xScale * 2048) >> 16);
+	DWORD yOrigin = floor;
+	MoveToEx(Memhdc, xOrigin - 15, yOrigin, NULL);
+	LineTo(Memhdc, xOrigin + 15, yOrigin);
+	MoveToEx(Memhdc, xOrigin, yOrigin-15, NULL);
+	LineTo(Memhdc, xOrigin, yOrigin+15);
+	
+	// if we have a dual display (strong & weak) draw the weak lines
 	if (DriveMode == dual) {
 		xScale = xScale * 3 / 4;
 		yScale = yScale * 3 / 4;
-		xOffset -= width/4;
+		xOffset -= width / 4;
 		floor -= height / 4;
 
 		WaitForSingleObject(hMutex, INFINITE);
@@ -207,7 +232,8 @@ void DoPaint(HWND hWnd){
 		SelectObject(Memhdc, hGrayPen);
 		Polyline(Memhdc, RedLine, N_POINTS);
 	}
-	
+
+	// draw some text
 	TCHAR text[20];
 	if (DriveMode == weak) {
 		TextOut(Memhdc, 15, 15, L"WEAK", 4);
@@ -215,7 +241,10 @@ void DoPaint(HWND hWnd){
 	_itot(scans, text, 10);
 	TextOut(Memhdc, 15, 30, text, _tcsclen(text));
 
+	// Blt the off-screen data onto the display
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
+
+	// clean up 
 	DeleteObject(Membitmap);
 	DeleteDC(Memhdc);
 	DeleteDC(hdc);
@@ -241,7 +270,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	switch (message)
 	{
 	case WM_COMMAND:
-		wmId    = LOWORD(wParam);
+		wmId = LOWORD(wParam);
 		wmEvent = HIWORD(wParam);
 		// Parse the menu selections:
 		switch (wmId)
@@ -320,7 +349,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	return (INT_PTR)FALSE;
 }
 
-void Damnit(wchar_t *msg) {
+void Damnit(wchar_t* msg) {
 	WCHAR errMsg[128];
 
 	if (msg == NULL) {

@@ -5,17 +5,17 @@
 
 #pragma comment(lib, "setupapi.lib")
 
-wchar_t* VidPids[] = {
+PTCHAR VidPids[] = {
 	L"\\\\?\\usb#vid_0483&pid_5740",
 	L"\\\\?\\usb#vid_0483&pid_5741"
 };
 
 
-wchar_t* NameOfMyCommDevice(
+PTCHAR NameOfMyCommDevice(
 	IN       HDEVINFO                    HardwareDeviceInfo,
 	IN       PSP_INTERFACE_DEVICE_DATA   DeviceInterfaceData)
 {
-	wchar_t* devName = NULL;
+	PTCHAR devName = NULL;
 	PSP_INTERFACE_DEVICE_DETAIL_DATA     functionClassDeviceData = NULL;
 	ULONG                                requiredLength = 0;
 	SP_DEVINFO_DATA						 devInfoData;
@@ -55,7 +55,7 @@ wchar_t* NameOfMyCommDevice(
 	}
 
 	for (int i = 0; i < sizeof(VidPids) / sizeof(VidPids[0]); i++) {
-		wchar_t* PidVidStr = VidPids[i];
+		PTCHAR PidVidStr = VidPids[i];
 		if (wcsncmp(functionClassDeviceData->DevicePath, PidVidStr, wcslen(PidVidStr)) == 0) {
 			devName = _wcsdup(functionClassDeviceData->DevicePath); // must be freed by caller not good form.
 			break;
@@ -69,7 +69,7 @@ wchar_t* NameOfMyCommDevice(
 
 HANDLE FindCommPort()
 {
-	wchar_t* devpath = NULL;
+	PTCHAR devpath = NULL;
 	HANDLE portHandle;
 	HDEVINFO                 hDevInfo;
 	SP_INTERFACE_DEVICE_DATA deviceInterfaceData;
@@ -125,6 +125,8 @@ HANDLE FindCommPort()
 		NULL);
 	if (portHandle == INVALID_HANDLE_VALUE)
 		Damnit(L"I/O Open failed");
+
+	// setup some reasonable timeouts on the comms. Allows for semi-graceful error recovery
 	COMMTIMEOUTS timeouts;
 	timeouts.ReadIntervalTimeout = 40;
 	timeouts.ReadTotalTimeoutMultiplier = 1;
@@ -135,7 +137,6 @@ HANDLE FindCommPort()
 	if (!SetCommTimeouts(portHandle, &timeouts))
 		Damnit(NULL);
 	PurgeComm(portHandle, PURGE_RXCLEAR);
-
 
 	if (devpath) free(devpath);
 

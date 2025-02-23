@@ -26,11 +26,17 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 	DWORD returnedReadings;
 	adcBuffer_t localBuf;
 
+	// send a ADC trigger command
 	WriteFile(ioHandle, &cmd, 1, &returnedReadings, NULL);
+
+	// get resultant data
 	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) 
 		Damnit(L"I/O error");
+
+	// validate the goodness of the returned data
 	if (sizeof(adcBuffer_t) == returnedReadings) {
 		if (0 == (localBuf[0] & 0x8000)) { // look for sync flag
+			// wait a bit... clear pending data and return with failure
 			Sleep(40);
 			PurgeComm(ioHandle, PURGE_RXCLEAR);
 			return false;
@@ -43,6 +49,7 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 		ReleaseMutex(hMutex);
 		return true;
 	}
+	// wait a bit... clear pending data and return with failure
 	Sleep(40);
 	PurgeComm(ioHandle, PURGE_RXCLEAR);
 	return false;
@@ -52,11 +59,12 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 void GetData(void) {
 	
 	while (!Stopping) {
+		// if we're paused, block the update
 		if (Hold) {
 			Sleep(100);
 			continue;
 		}
-		if (!GrabAFrame(DataPoints, DriveMode != weak ? 'T' : 'W')) // trigger strong scan
+		if (!GrabAFrame(DataPoints, DriveMode != weak ? 'T' : 'W')) // trigger single scan
 			continue;
 		if (DriveMode == dual) {
 			if (!GrabAFrame(AltData, 'W')) // trigger weak scan
