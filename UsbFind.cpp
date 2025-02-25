@@ -6,8 +6,8 @@
 #pragma comment(lib, "setupapi.lib")
 
 PTCHAR VidPids[] = {
-	L"\\\\?\\usb#vid_0483&pid_5740",
-	L"\\\\?\\usb#vid_0483&pid_5741"
+	L"\\\\?\\usb#vid_16d0&pid_13f9",  // 5840-5113 in decimal
+	L"\\\\?\\usb#vid_0483&pid_5740"  // default ST Micro PID (should phase out)
 };
 
 
@@ -74,7 +74,6 @@ HANDLE FindCommPort()
 	HDEVINFO                 hDevInfo;
 	SP_INTERFACE_DEVICE_DATA deviceInterfaceData;
 	ULONG                    devIndex = 0;
-	BOOLEAN                  done;
 
 	//
 	// Open a handle to the plug and play dev node.
@@ -110,6 +109,7 @@ HANDLE FindCommPort()
 		devpath = NameOfMyCommDevice(hDevInfo, &deviceInterfaceData);
 		if (devpath != NULL)
 			break;
+		devIndex++;
 	}
 
 	if (!devpath)

@@ -149,8 +149,8 @@ void DoPaint(HWND hWnd) {
 	PAINTSTRUCT ps;
 	HBITMAP Membitmap;
 	RECT rc;
-	long xScale, yScale, width, height, xOffset;
-	WORD i, ii, floor;
+	long xScale, yScale, width, height, xOffset, floor;
+	WORD i, ii;
 	static POINT BlackLine[N_POINTS];	// vertices of black polyline
 	static POINT RedLine[N_POINTS];		// " " of Red Line
 
@@ -349,7 +349,7 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	return (INT_PTR)FALSE;
 }
 
-void Damnit(wchar_t* msg) {
+void Damnit(PTCHAR msg) {
 	WCHAR errMsg[128];
 
 	if (msg == NULL) {

@@ -16,9 +16,10 @@ extern bool Stopped;
 extern bool Stopping;
 extern HANDLE hMutex;
 extern DWORD scans;
+extern BYTE DeviceID[4]; // bytes 1:0 are serial number, 2 - rev level, 3 - device type
 
 enum  Mode { strong, weak, dual };
 extern Mode DriveMode;
 
 DWORD WINAPI WorkerProc(LPVOID lpParam);
-void Damnit(wchar_t *msg);
+void Damnit(PTCHAR msg);

@@ -6,23 +6,32 @@
 adcBuffer_t DataPoints;
 adcBuffer_t AltData;
 HANDLE ioHandle;
+BYTE DeviceID[4];
 
-void GetData(void);
 
-
-void InitComms(){
+void InitComms() {
+	DWORD readSize;
 	ioHandle = FindCommPort();
 	if (ioHandle == INVALID_HANDLE_VALUE) Damnit(L"Couldn't Find Device");
+
+	char cmd = '?';
+
+	WriteFile(ioHandle, &cmd, 1, &readSize, NULL);
+
+	// get resultant data
+	if (!ReadFile(ioHandle, DeviceID, sizeof(DeviceID), &readSize, NULL))
+		Damnit(L"I/O error");
+	if (DeviceID[3] != 1)
+		Damnit(L"Unrecognized Device");
+	if (DeviceID[2] > 1)
+		Damnit(L"Device needs new rev of SW");
+
 }
 
 
-DWORD WINAPI WorkerProc(LPVOID lpParam) {
-	InitComms();
-	GetData();
-	ExitThread(0);
-}
 
-bool GrabAFrame(adcBuffer_t buf, char cmd){
+
+bool GrabAFrame(adcBuffer_t buf, char cmd) {
 	DWORD returnedReadings;
 	adcBuffer_t localBuf;
 
@@ -30,7 +39,7 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 	WriteFile(ioHandle, &cmd, 1, &returnedReadings, NULL);
 
 	// get resultant data
-	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL)) 
+	if (!ReadFile(ioHandle, localBuf, sizeof(adcBuffer_t), &returnedReadings, NULL))
 		Damnit(L"I/O error");
 
 	// validate the goodness of the returned data
@@ -57,7 +66,7 @@ bool GrabAFrame(adcBuffer_t buf, char cmd){
 
 // Data acquisition loop
 void GetData(void) {
-	
+
 	while (!Stopping) {
 		// if we're paused, block the update
 		if (Hold) {
@@ -80,4 +89,10 @@ void GetData(void) {
 	//Stop the stream
 	CloseHandle(ioHandle);
 	Stopped = true;
+}
+
+DWORD WINAPI WorkerProc(LPVOID lpParam) {
+	InitComms();
+	GetData();
+	ExitThread(0);
 }
