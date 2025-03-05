@@ -33,7 +33,6 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
-	// TODO: Place code here.
 	hMutex = CreateMutex(NULL, FALSE, NULL);
 	MSG msg;
 	HACCEL hAccelTable;
@@ -143,6 +142,16 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 	return TRUE;
 }
 
+void SetTitleText(HWND hWnd) {
+	TCHAR text[80];
+	static bool doneOnce = false;
+	if (!doneOnce) {
+		swprintf(text, sizeof(text), L"CurveBug   (Ver:%s HW:%d FW:%d) S/N: %d",
+			VERSION_STRING, DeviceID[3], DeviceID[2],*(WORD*)&DeviceID[0]);
+		SetWindowText(hWnd, text);
+	}
+}
+
 
 void DoPaint(HWND hWnd) {
 	HDC hdc, Memhdc;
@@ -248,6 +257,7 @@ void DoPaint(HWND hWnd) {
 	DeleteObject(Membitmap);
 	DeleteDC(Memhdc);
 	DeleteDC(hdc);
+	SetTitleText(hWnd);
 	EndPaint(hWnd, &ps);
 }
 

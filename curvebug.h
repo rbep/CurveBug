@@ -2,6 +2,8 @@
 
 #include "resource.h"
 
+#define VERSION_STRING L"1.01"
+
 #define ADC_MAX 2800L
 #define N_POINTS (1008/3)
 #define BACKGROUND_COLOR RGB(200, 200, 200)
