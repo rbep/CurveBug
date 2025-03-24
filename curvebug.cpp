@@ -15,6 +15,7 @@ TCHAR szWindowClass[MAX_LOADSTRING];			// the main window class name
 bool Stopped = false;
 bool Stopping = false;
 bool Hold = false;								// just pause the data
+bool SingleTrace = false;						// only one trace
 DWORD scans = 0;
 HANDLE hMutex;
 Mode DriveMode = strong;
@@ -205,8 +206,10 @@ void DoPaint(HWND hWnd) {
 	// paint the poly-lines
 	SelectObject(Memhdc, hBlackPen);
 	Polyline(Memhdc, BlackLine, N_POINTS);
-	SelectObject(Memhdc, hRedPen);
-	Polyline(Memhdc, RedLine, N_POINTS);
+	if (!SingleTrace){
+		SelectObject(Memhdc, hRedPen);
+		Polyline(Memhdc, RedLine, N_POINTS);
+	}
 	SelectObject(Memhdc, hGreenPen);
 
 	// draw an origin marker
@@ -315,6 +318,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			break;
 		case 'P':
 			Hold = true;
+			break;
+		case 'S':
+			SingleTrace = !SingleTrace;
 			break;
 		}
 		break;

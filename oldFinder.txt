@@ -1,0 +1,247 @@
+#include "stdafx.h"
+
+extern "C" {
+#include <hidsdi.h>
+}
+#pragma warning( pop )
+#include "UsbFind.h"
+
+wchar_t* VidPids[] = {
+	L"\\\\?\\hid#vid_15a2&pid_0054", // quad core iMX6
+	L"\\\\?\\hid#vid_15a2&pid_0061"  // dual lite iMX6
+};
+
+
+
+// {86E0D1E0-8089-11D0-9CE4-08003E301F73}
+DEFINE_GUID(GUID_DEVINTERFACE_COMPORT, 0X86E0D1E0L, 0X8089, 0X11D0, 0X9C, 0XE4, 0X08, 0X00, 0X3E, 0X30, 0X1F, 0X73);
+
+/*
+HIDP_CAPS		Capabilities;
+_HID_DATA_REPORT		*pReadReport = NULL;
+_HID_DATA_REPORT		*pWriteReport = NULL;
+*/
+
+HANDLE OpenSpecifiedDevice(
+	IN       HDEVINFO                    HardwareDeviceInfo,
+	IN       PSP_INTERFACE_DEVICE_DATA   DeviceInterfaceData,
+	OUT		 wchar_t**					 devName,
+	OUT      DWORD&						 devInst,
+	rsize_t	 bufsize
+)
+/*++
+Routine Description:
+
+Given the HardwareDeviceInfo, representing a handle to the plug and
+play information, and deviceInfoData, representing a specific usb device,
+open that device and fill in all the relevant information in the given
+USB_DEVICE_DESCRIPTOR structure.
+
+Arguments:
+
+HardwareDeviceInfo:  handle to info obtained from Pnp mgr via SetupDiGetClassDevs()
+DeviceInfoData:      ptr to info obtained via SetupDiEnumInterfaceDevice()
+
+Return Value:
+
+return HANDLE if the open and initialization was successfull,
+else INVLAID_HANDLE_VALUE.
+
+--*/
+{
+	PSP_INTERFACE_DEVICE_DETAIL_DATA     functionClassDeviceData = NULL;
+	ULONG                                predictedLength = 0;
+	ULONG                                requiredLength = 0;
+	HANDLE								 hOut = INVALID_HANDLE_VALUE;
+	SP_DEVINFO_DATA						 devInfoData;
+
+	//
+	// allocate a function class device data structure to receive the
+	// goods about this particular device.
+	//
+	SetupDiGetInterfaceDeviceDetail(
+		HardwareDeviceInfo,
+		DeviceInterfaceData,
+		NULL, // probing so no output buffer yet
+		0, // probing so output buffer length of zero
+		&requiredLength,
+		NULL); // not interested in the specific dev-node
+
+
+	predictedLength = requiredLength;
+
+	functionClassDeviceData = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(predictedLength);
+	functionClassDeviceData->cbSize = sizeof(SP_INTERFACE_DEVICE_DETAIL_DATA);
+	devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
+
+	//
+	// Retrieve the information from Plug and Play.
+	//
+	if (!SetupDiGetInterfaceDeviceDetail(
+		HardwareDeviceInfo,
+		DeviceInterfaceData,
+		functionClassDeviceData,
+		predictedLength,
+		&requiredLength,
+		&devInfoData))
+	{
+		free(functionClassDeviceData);
+		return INVALID_HANDLE_VALUE;
+	}
+
+	*devName = NULL;
+	for (int i = 0; i < sizeof(VidPids) / sizeof(VidPids[0]); i++) {
+		wchar_t *PidVidStr = VidPids[i];
+		if (wcsncmp(functionClassDeviceData->DevicePath, PidVidStr, wcslen(PidVidStr)) == 0) {
+			*devName = _wcsdup(functionClassDeviceData->DevicePath); // must be freed by caller not good form.
+			hOut = (HANDLE)3;
+			break;
+		}
+	}
+
+	free(functionClassDeviceData);
+	return hOut;
+}
+
+
+HANDLE OpenUsbDevice(LPGUID  pGuid, wchar_t** devpath, DWORD& outDevInst, rsize_t bufsize)
+/*++
+Routine Description:
+
+Do the required PnP things in order to find the next available proper device in the system at this time.
+
+Arguments:
+pGuid:      ptr to GUID registered by the driver itself
+devpath: the generated name for this device
+
+Return Value:
+
+return HANDLE if the open and initialization was successful,
+else INVALID_HANDLE_VALUE.
+--*/
+{
+	ULONG                    NumberDevices = 20;
+	HANDLE                   hOut = INVALID_HANDLE_VALUE;
+	HDEVINFO                 hDevInfo;
+	SP_INTERFACE_DEVICE_DATA deviceInterfaceData;
+	ULONG                    i;
+	BOOLEAN                  done;
+
+	//
+	// Open a handle to the plug and play dev node.
+	// SetupDiGetClassDevs() returns a device information set that contains info on all
+	// installed devices of a specified class.
+	//
+	hDevInfo = SetupDiGetClassDevs(
+		pGuid,
+		NULL, // Define no enumerator (global)
+		NULL, // Define no
+		(DIGCF_PRESENT | // Only Devices present
+			DIGCF_INTERFACEDEVICE)); // Function class devices.
+	if (hDevInfo == INVALID_HANDLE_VALUE)
+	{
+		// Insert error handling here.
+		return INVALID_HANDLE_VALUE;
+	}
+	//
+	// Take a wild guess at the number of devices we have;
+	// Be prepared to realloc and retry if there are more than we guessed
+	//
+	deviceInterfaceData.cbSize = sizeof(SP_INTERFACE_DEVICE_DATA);
+
+	for (i = 0, done = FALSE; !done;) {
+		NumberDevices *= 2;  // keep increasing the number of devices until we reach the limit
+		for (; i < NumberDevices; i++) {
+
+			// SetupDiEnumDeviceInterfaces() returns information about device interfaces
+			// exposed by one or more devices. Each call returns information about one interface;
+			// the routine can be called repeatedly to get information about several interfaces
+			// exposed by one or more devices.
+			if (SetupDiEnumDeviceInterfaces(
+				hDevInfo,   // pointer to a device information set
+				NULL,       // pointer to an SP_DEVINFO_DATA, We don't care about specific PDOs
+				pGuid,      // pointer to a GUID
+				i,          //zero-based index into the list of interfaces in the device information set
+				&deviceInterfaceData)) // pointer to a caller-allocated buffer that contains a completed SP_DEVICE_INTERFACE_DATA structure
+			{
+				// open the device
+				hOut = OpenSpecifiedDevice(hDevInfo, &deviceInterfaceData, devpath, outDevInst, bufsize);
+				if (hOut != INVALID_HANDLE_VALUE)
+				{
+					done = TRUE;
+					break;
+				}
+			}
+			else {
+				// EnumDeviceInterfaces error
+				if (ERROR_NO_MORE_ITEMS == GetLastError())
+					done = TRUE;
+			}
+		}  // end-for
+	}
+
+	// SetupDiDestroyDeviceInfoList() destroys a device information set and frees all associated memory.
+	SetupDiDestroyDeviceInfoList(hDevInfo);
+	return hOut;
+}
+
+
+
+HANDLE FindCommPort()
+{
+	wchar_t* devpath = NULL;
+	DWORD dwDevInst = 0;
+	int err = ERROR_SUCCESS;
+	HANDLE handle;
+
+	//
+	// Find and open a handle to the hid driver object.
+	//
+	if (OpenUsbDevice((LPGUID)&GUID_DEVINTERFACE_COMPORT, &devpath, dwDevInst, MAX_PATH) == INVALID_HANDLE_VALUE)
+	{
+		// Failed to find our device.  This can happen on initial startup.
+		return 0;
+	}
+
+	handle = CreateFile(devpath, //openCommPort ??? jjjj
+		GENERIC_READ | GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE,
+		NULL,
+		OPEN_EXISTING,
+		0,
+		NULL);
+	if (devpath) free(devpath);
+
+	if (handle == INVALID_HANDLE_VALUE)
+		return NULL;
+
+#if 1
+	COMMTIMEOUTS timeouts;
+	timeouts.ReadIntervalTimeout = 5;
+	timeouts.ReadTotalTimeoutMultiplier = 1;
+	timeouts.ReadTotalTimeoutConstant = 200;
+	timeouts.WriteTotalTimeoutConstant = 200;
+	timeouts.WriteTotalTimeoutMultiplier = 1;
+
+	err = SetCommTimeouts(handle, &timeouts);
+	if (err != ERROR_SUCCESS)
+		return NULL;
+#endif
+
+#if 0
+	memset(&Capabilities, 0, sizeof(Capabilities));
+
+	err = AllocateIoBuffers(handle);
+	if (err != ERROR_SUCCESS)
+	{
+		//TRACE(__FUNCTION__ " ERROR: AllocateIoBuffers failed.\n");
+		return NULL;
+	}
+#endif
+	return handle;
+
+}
+
+
+
+
