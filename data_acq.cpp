@@ -23,8 +23,8 @@ void InitComms() {
 		Damnit(L"I/O error");
 	if (DeviceID[3] != 1)
 		Damnit(L"Unrecognized Device");
-	if (DeviceID[2] > 1)
-		Damnit(L"Device needs new rev of SW");
+	if (DeviceID[2] > 2)
+		Damnit(L"This software must be updated");
 
 }
 

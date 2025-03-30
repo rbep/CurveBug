@@ -7,7 +7,7 @@
 
 PTCHAR VidPids[] = {
 	L"\\\\?\\usb#vid_16d0&pid_13f9",  // 5840-5113 in decimal
-	L"\\\\?\\usb#vid_0483&pid_5740"  // default ST Micro PID (should phase out)
+	//L"\\\\?\\usb#vid_0483&pid_5740"  // default ST Micro PID (should phase out)
 };
 
 
@@ -34,7 +34,7 @@ PTCHAR NameOfMyCommDevice(
 
 
 
-	functionClassDeviceData = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(requiredLength);
+	functionClassDeviceData = (PSP_INTERFACE_DEVICE_DETAIL_DATA)malloc(requiredLength); 
 	if (functionClassDeviceData == NULL) Damnit(NULL);
 	functionClassDeviceData->cbSize = sizeof(SP_INTERFACE_DEVICE_DETAIL_DATA);
 	devInfoData.cbSize = sizeof(SP_DEVINFO_DATA);
@@ -115,7 +115,9 @@ HANDLE FindCommPort()
 	if (!devpath)
 		Damnit(L"Couldn't Find Device");
 
-	SetupDiDestroyDeviceInfoList(hDevInfo);
+	SetupDiDestroyDeviceInfoList(hDevInfo); // clean up the device info list
+
+	// open the device
 	portHandle = CreateFile(devpath,
 		GENERIC_READ | GENERIC_WRITE,
 		NULL,
@@ -134,11 +136,11 @@ HANDLE FindCommPort()
 	timeouts.WriteTotalTimeoutConstant = 200;
 	timeouts.WriteTotalTimeoutMultiplier = 1;
 
-	if (!SetCommTimeouts(portHandle, &timeouts))
+	if (!SetCommTimeouts(portHandle, &timeouts)) // set the timeouts
 		Damnit(NULL);
-	PurgeComm(portHandle, PURGE_RXCLEAR);
+	PurgeComm(portHandle, PURGE_RXCLEAR); // clear out any garbage
 
-	if (devpath) free(devpath);
+	if (devpath) free(devpath); // free the device path string
 
 	return portHandle;
 

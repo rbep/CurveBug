@@ -2,7 +2,7 @@
 
 #include "resource.h"
 
-#define VERSION_STRING L"1.01"
+#define VERSION_STRING L"1.02"
 
 #define ADC_MAX 2800L
 #define N_POINTS (1008/3)

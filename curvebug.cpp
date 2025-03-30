@@ -148,7 +148,7 @@ void SetTitleText(HWND hWnd) {
 	static bool doneOnce = false;
 	if (!doneOnce) {
 		swprintf(text, sizeof(text), L"CurveBug   (Ver:%s HW:%d FW:%d) S/N: %d",
-			VERSION_STRING, DeviceID[3], DeviceID[2],*(WORD*)&DeviceID[0]);
+			VERSION_STRING, DeviceID[3], DeviceID[2], *(WORD*)&DeviceID[0]);
 		SetWindowText(hWnd, text);
 	}
 }
@@ -172,7 +172,7 @@ void DoPaint(HWND hWnd) {
 	floor = height * 7 / 8 + rc.top;
 	xOffset = (rc.left + width - 1);
 	xScale = ((DWORD)width << 16) / ADC_MAX;	// eschew floating point
-	yScale = (height << 16) / (ADC_MAX - 700);	
+	yScale = (height << 16) / (ADC_MAX - 700);
 
 
 	hdc = BeginPaint(hWnd, &ps);	// mystic call that Windows requires
@@ -195,7 +195,6 @@ void DoPaint(HWND hWnd) {
 		BlackLine[ii].x = xOffset - ((xScale * DataPoints[1 + i]) >> 16);
 		BlackLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[1 + i])) >> 16) + floor;
 	}
-
 	for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
 		RedLine[ii].x = xOffset - ((xScale * DataPoints[2 + i]) >> 16);
 		RedLine[ii].y = ((yScale * (DataPoints[0 + i] - DataPoints[2 + i])) >> 16) + floor;
@@ -206,7 +205,7 @@ void DoPaint(HWND hWnd) {
 	// paint the poly-lines
 	SelectObject(Memhdc, hBlackPen);
 	Polyline(Memhdc, BlackLine, N_POINTS);
-	if (!SingleTrace){
+	if (!SingleTrace) {
 		SelectObject(Memhdc, hRedPen);
 		Polyline(Memhdc, RedLine, N_POINTS);
 	}
@@ -217,9 +216,9 @@ void DoPaint(HWND hWnd) {
 	DWORD yOrigin = floor;
 	MoveToEx(Memhdc, xOrigin - 15, yOrigin, NULL);
 	LineTo(Memhdc, xOrigin + 15, yOrigin);
-	MoveToEx(Memhdc, xOrigin, yOrigin-15, NULL);
-	LineTo(Memhdc, xOrigin, yOrigin+15);
-	
+	MoveToEx(Memhdc, xOrigin, yOrigin - 15, NULL);
+	LineTo(Memhdc, xOrigin, yOrigin + 15);
+
 	// if we have a dual display (strong & weak) draw the weak lines
 	if (DriveMode == dual) {
 		xScale = xScale * 3 / 4;
@@ -229,20 +228,21 @@ void DoPaint(HWND hWnd) {
 
 		WaitForSingleObject(hMutex, INFINITE);
 		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-			BlackLine[ii].x = xOffset - ((xScale * AltData[2 + i]) >> 16);
-			BlackLine[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
+			BlackLine[ii].x = xOffset - ((xScale * AltData[1 + i]) >> 16);
+			BlackLine[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
 		}
-
 		for (ii = i = 0; i < N_POINTS * 3; i += 3, ii++) {
-			RedLine[ii].x = xOffset - ((xScale * AltData[1 + i]) >> 16);
-			RedLine[ii].y = ((yScale * (AltData[0 + i] - AltData[1 + i])) >> 16) + floor;
+			RedLine[ii].x = xOffset - ((xScale * AltData[2 + i]) >> 16);
+			RedLine[ii].y = ((yScale * (AltData[0 + i] - AltData[2 + i])) >> 16) + floor;
 		}
 		ReleaseMutex(hMutex);
 
-		SelectObject(Memhdc, hPinkPen);
-		Polyline(Memhdc, BlackLine, N_POINTS);
 		SelectObject(Memhdc, hGrayPen);
-		Polyline(Memhdc, RedLine, N_POINTS);
+		Polyline(Memhdc, BlackLine, N_POINTS);
+		if (!SingleTrace) {
+			SelectObject(Memhdc, hPinkPen);
+			Polyline(Memhdc, RedLine, N_POINTS);
+		}
 	}
 
 	// draw some text
@@ -279,6 +279,7 @@ void DoPaint(HWND hWnd) {
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	int wmId, wmEvent;
+	bool wasHold = Hold;
 
 	switch (message)
 	{
@@ -317,7 +318,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
 			break;
 		case 'P':
-			Hold = true;
+			Hold = !wasHold;
 			break;
 		case 'S':
 			SingleTrace = !SingleTrace;
