@@ -26,8 +26,13 @@ HANDLE FindCommPort(void);
 int main()
 {
 	HANDLE port = FindCommPort();
-	WriteFile(port, "E", 1, NULL, NULL);
-
+	for (int i = 0; i < 30; i++) {
+		WriteFile(port, "E", 1, NULL, NULL);
+		FlushFileBuffers(port);
+		Sleep(50);
+	}
+	WriteFile(port, "T", 1, NULL, NULL);
+	FlushFileBuffers(port);
     std::cout << "Zapped!\n";
 
 }
