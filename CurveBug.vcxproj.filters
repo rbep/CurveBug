@@ -55,4 +55,9 @@
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="COPYING.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+  </ItemGroup>
 </Project>

@@ -1,3 +1,21 @@
+/***************************************************************************
+ *
+ *  Project  CurveBug
+ *
+ * Copyright (C) Robert Puckette, 2024-2025
+ *
+ * This software is licensed as described in the file COPYING.txt, which
+ * you should have received as part of this distribution.
+ *
+ * You may opt to use, copy, modify, merge, publish, distribute and/or sell
+ * copies of the Software, and permit persons to whom the Software is
+ * furnished to do so, under the terms of the COPYING file.
+ *
+ * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
+ * KIND, either express or implied.
+ *
+ *
+ ***************************************************************************/
 #include "stdafx.h"
 #include "curvebug.h"
 #include "UsbFind.h"
@@ -11,6 +29,7 @@ BYTE DeviceID[4];
 
 void InitComms() {
 	DWORD readSize;
+	int retVal;
 	ioHandle = FindCommPort();
 	if (ioHandle == INVALID_HANDLE_VALUE) Damnit(L"Couldn't Find Device");
 
@@ -20,12 +39,17 @@ void InitComms() {
 
 	// get resultant data
 	if (!ReadFile(ioHandle, DeviceID, sizeof(DeviceID), &readSize, NULL))
-		Damnit(L"I/O error");
-	return;
-	if (DeviceID[3] != 1)
-		Damnit(L"Unrecognized Device");
-	if (DeviceID[2] > 2)
-		Damnit(L"This software must be updated");
+		Damnit(L"CurveBug device not communicating");
+	if (DeviceID[3] > 2 ||
+		DeviceID[2] > 3) {
+		retVal = MessageBox(hWnd,
+			L"A possible incompatibily exists between this application and the attached CurveBug. "
+			"You should consider updating this application. Do you wish to continue?",
+			L"Potential Issue",
+			MB_SYSTEMMODAL | MB_ICONWARNING | MB_YESNO | MB_DEFBUTTON2);
+		if (retVal == IDNO)
+			exit(1);
+	}
 
 }
 

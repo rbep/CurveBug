@@ -98,6 +98,9 @@
   <ItemGroup>
     <ResourceCompile Include="curvebug.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="COPYING.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
