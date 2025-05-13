@@ -21,6 +21,7 @@ void InitComms() {
 	// get resultant data
 	if (!ReadFile(ioHandle, DeviceID, sizeof(DeviceID), &readSize, NULL))
 		Damnit(L"I/O error");
+	return;
 	if (DeviceID[3] != 1)
 		Damnit(L"Unrecognized Device");
 	if (DeviceID[2] > 2)
