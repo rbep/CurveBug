@@ -20,6 +20,7 @@
 
 #include <ntddser.h>
 #include "curvebug.h"
+#include "UsbFind.h"
 
 #pragma comment(lib, "setupapi.lib")
 
@@ -28,6 +29,19 @@ PTCHAR VidPids[] = {
 	//L"\\\\?\\usb#vid_0483&pid_5740"  // default ST Micro PID (should phase out)
 };
 
+void SetupComm(HANDLE hFile) {
+	if (hFile == INVALID_HANDLE_VALUE)
+		return;
+	COMMTIMEOUTS timeouts;
+	timeouts.ReadIntervalTimeout = 40;
+	timeouts.ReadTotalTimeoutMultiplier = 1;
+	timeouts.ReadTotalTimeoutConstant = 200;
+	timeouts.WriteTotalTimeoutConstant = 200;
+	timeouts.WriteTotalTimeoutMultiplier = 1;
+	if (!SetCommTimeouts(hFile, &timeouts)) // set the timeouts
+		Damnit(NULL);
+	PurgeComm(hFile, PURGE_RXCLEAR); // clear out any garbage
+}
 
 PTCHAR NameOfMyCommDevice(
 	IN       HDEVINFO                    HardwareDeviceInfo,
@@ -130,10 +144,10 @@ HANDLE FindCommPort()
 		devIndex++;
 	}
 
-	if (!devpath)
-		Damnit(L"Couldn't Find Device");
-
 	SetupDiDestroyDeviceInfoList(hDevInfo); // clean up the device info list
+
+	if (!devpath)
+		return AlternateFindCommPort(); // try the alternate method
 
 	// open the device
 	portHandle = CreateFile(devpath,
@@ -143,25 +157,48 @@ HANDLE FindCommPort()
 		OPEN_EXISTING,
 		0,
 		NULL);
-	if (portHandle == INVALID_HANDLE_VALUE)
-		Damnit(L"I/O Open failed");
-
-	// setup some reasonable timeouts on the comms. Allows for semi-graceful error recovery
-	COMMTIMEOUTS timeouts;
-	timeouts.ReadIntervalTimeout = 40;
-	timeouts.ReadTotalTimeoutMultiplier = 1;
-	timeouts.ReadTotalTimeoutConstant = 200;
-	timeouts.WriteTotalTimeoutConstant = 200;
-	timeouts.WriteTotalTimeoutMultiplier = 1;
-
-	if (!SetCommTimeouts(portHandle, &timeouts)) // set the timeouts
-		Damnit(NULL);
-	PurgeComm(portHandle, PURGE_RXCLEAR); // clear out any garbage
+	if (portHandle != INVALID_HANDLE_VALUE) {
+		SetupComm(portHandle);
+	}
 
 	if (devpath) free(devpath); // free the device path string
 
 	return portHandle;
 
 }
+HANDLE AlternateFindCommPort()
+{
+	HANDLE portHandle = INVALID_HANDLE_VALUE;
+	TCHAR portName[100];
+	int PortNum = 100;
+	DWORD Received;
+	// open the device
+	while (portHandle == INVALID_HANDLE_VALUE && PortNum > 1) {
+		swprintf(portName, sizeof(portName), L"\\\\.\\COM%d", --PortNum);
+		portHandle = CreateFile(portName,
+			GENERIC_READ | GENERIC_WRITE,
+			NULL,
+			NULL,
+			OPEN_EXISTING,
+			0,
+			NULL);
+		if (portHandle != INVALID_HANDLE_VALUE) {
+			SetupComm(portHandle);
+			WriteFile(portHandle, "?", 1, NULL, NULL);
+			Received = 0;
+			ReadFile(portHandle, portName, sizeof(portName), &Received, NULL);
+			if (Received == 4) {
+				
+			}
+			else {
+				CloseHandle(portHandle);
+				portHandle = INVALID_HANDLE_VALUE;
+			}
+		}
+	}
+
+	return portHandle;
+}
+
 
 

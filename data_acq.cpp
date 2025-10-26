@@ -38,7 +38,7 @@ void InitComms() {
 	WriteFile(ioHandle, &cmd, 1, &readSize, NULL);
 
 	// get resultant data
-	if (!ReadFile(ioHandle, DeviceID, sizeof(DeviceID), &readSize, NULL))
+	if (!ReadFile(ioHandle, DeviceID, sizeof(DeviceID), &readSize, NULL) || readSize != 4)
 		Damnit(L"CurveBug device not communicating");
 	if (DeviceID[3] > 2 ||
 		DeviceID[2] > 3) {

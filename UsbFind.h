@@ -17,3 +17,4 @@
  *
  ***************************************************************************/
 HANDLE FindCommPort(void);
+HANDLE AlternateFindCommPort(void);
