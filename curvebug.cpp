@@ -107,7 +107,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 	wcex.cbWndExtra = 0;
 	wcex.hInstance = hInstance;
 	wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CURVEBUG));
-	wcex.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wcex.hCursor = LoadCursor(NULL, IDC_CROSS);
 	//wcex.hbrBackground	= (HBRUSH)(COLOR_WINDOW+1);
 	wcex.hbrBackground = CreateSolidBrush(BACKGROUND_COLOR);
 	wcex.lpszMenuName = L""; //MAKEINTRESOURCE(IDC_CURVE3);
@@ -235,6 +235,31 @@ void DoPaint(HWND hWnd) {
 	MoveToEx(Memhdc, xOrigin, yOrigin - 15, NULL);
 	LineTo(Memhdc, xOrigin, yOrigin + 15);
 
+	// draw some text
+	TCHAR text[25];
+	if (DriveMode == weak) {
+		TextOut(Memhdc, 10, 10, L"WEAK", 4);
+	}
+	POINT pt;
+	GetCursorPos(&pt);
+	ScreenToClient(hWnd, &pt);
+	if (pt.x < 0 || pt.x >= width || pt.y < 0 || pt.y >= height) {
+		// if the cursor is out of bounds just show scans
+		wsprintf(text, L"%ld scans", scans);
+		TextOut(Memhdc, 10, 25, text, _tcsclen(text));
+	} else {
+		long t;
+		t = (((long)xOffset - pt.x) << 16) / xScale; // convert to ADC units
+		t = (t * 3000) / 2048 - 3000; // convert to millivolts
+		wsprintf(text, L"%ld mV", t);
+		TextOut(Memhdc, 10, 25, text, _tcsclen(text));
+		t = ((pt.y - (long)floor) << 16) / yScale; // convert to ADC units
+		t = (t * (DriveMode == weak ? 32 :683)) / 2048; // convert to microamps
+		wsprintf(text, L"%ld uA", t);
+		TextOut(Memhdc, 10, 40, text, _tcsclen(text));
+
+	}
+
 	// if we have a dual display (strong & weak) draw the weak lines
 	if (DriveMode == dual) {
 		xScale = xScale * 3 / 4;
@@ -260,15 +285,6 @@ void DoPaint(HWND hWnd) {
 			Polyline(Memhdc, RedLine, N_POINTS);
 		}
 	}
-
-	// draw some text
-	TCHAR text[20];
-	if (DriveMode == weak) {
-		TextOut(Memhdc, 15, 15, L"WEAK", 4);
-	}
-	_itot(scans, text, 10);
-	TextOut(Memhdc, 15, 30, text, _tcsclen(text));
-
 	// Blt the off-screen data onto the display
 	BitBlt(hdc, 0, 0, width, height, Memhdc, 0, 0, SRCCOPY);
 
